@@ -2,12 +2,11 @@ extern crate termion;
 extern crate toml;
 extern crate tui;
 
+mod ui;
+
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
-use std::sync::mpsc;
-use std::thread;
-use std::time::Duration;
 use termion::event::Key;
 use termion::input::MouseTerminal;
 use termion::input::TermRead;
@@ -19,6 +18,7 @@ use tui::layout::{Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Tabs, Text, Widget};
 use tui::Terminal;
+use ui::{Event, Events, TabsState};
 
 const CONFIG_FILE_NAME: &str = "config.toml";
 const CONFIG_LOG_PATH_TOML_PROPERTY: &str = "log_path";
@@ -26,108 +26,6 @@ const MESSAGE_TYPES_TOML_PROPERTY: &str = "message_types";
 
 struct App<'a> {
     tabs: TabsState<'a>,
-}
-
-pub struct TabsState<'a> {
-    titles: Vec<&'a str>,
-    index: usize,
-}
-
-impl<'a> TabsState<'a> {
-    pub fn new(titles: Vec<&'a str>) -> TabsState {
-        TabsState { titles, index: 0 }
-    }
-    pub fn next(&mut self) {
-        self.index = (self.index + 1) % self.titles.len();
-    }
-
-    pub fn previous(&mut self) {
-        if self.index > 0 {
-            self.index -= 1;
-        } else {
-            self.index = self.titles.len() - 1;
-        }
-    }
-}
-
-pub enum Event<I> {
-    Input(I),
-    Tick,
-}
-
-pub struct Events {
-    rx: mpsc::Receiver<Event<Key>>,
-    input_handle: thread::JoinHandle<()>,
-    tick_handle: thread::JoinHandle<()>,
-}
-
-impl Default for Events {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Config {
-    pub exit_key: Key,
-    pub tick_rate: Duration,
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            exit_key: Key::Char('q'),
-            tick_rate: Duration::from_millis(250),
-        }
-    }
-}
-
-impl Events {
-    pub fn new() -> Events {
-        Events::with_config(Config::default())
-    }
-
-    pub fn with_config(config: Config) -> Events {
-        let (tx, rx) = mpsc::channel();
-
-        let input_handle = {
-            let tx = tx.clone();
-            thread::spawn(move || {
-                let stdin = io::stdin();
-                for evt in stdin.keys() {
-                    if let Ok(key) = evt {
-                        if tx.send(Event::Input(key)).is_err() {
-                            return;
-                        }
-                        if key == config.exit_key {
-                            return;
-                        }
-                    }
-                }
-            })
-        };
-
-        let tick_handle = {
-            let tx = tx.clone();
-            thread::spawn(move || {
-                let tx = tx.clone();
-                loop {
-                    tx.send(Event::Tick).unwrap();
-                    thread::sleep(config.tick_rate);
-                }
-            })
-        };
-
-        Events {
-            rx,
-            input_handle,
-            tick_handle,
-        }
-    }
-
-    pub fn next(&self) -> Result<Event<Key>, mpsc::RecvError> {
-        self.rx.recv()
-    }
 }
 
 fn main() {
@@ -170,7 +68,7 @@ fn main() {
     for _ in 0..message_types.len() {
         captured_messages.push(vec![]);
     }
-    
+
     loop {
         terminal
             .draw(|mut f| {
@@ -192,16 +90,19 @@ fn main() {
                     .style(Style::default().fg(Color::Cyan))
                     .highlight_style(Style::default().fg(Color::Yellow))
                     .render(&mut f, chunks[0]);
-                                
-                let events = match app.tabs.index < message_types.len() {
-                    true => &captured_messages[app.tabs.index],
-                    false => &all_messages,
+
+                let events = if app.tabs.index < message_types.len() {
+                    &captured_messages[app.tabs.index]
+                } else {
+                    &all_messages
                 };
 
-                let events = events
-                     .iter()
-                     .rev()
-                     .map(|evt| Text::styled(evt, Style::default().fg(Color::Indexed((app.tabs.index + 1) as u8))));
+                let events = events.iter().rev().map(|evt| {
+                    Text::styled(
+                        evt,
+                        Style::default().fg(Color::Indexed((app.tabs.index + 1) as u8)),
+                    )
+                });
 
                 List::new(events)
                     .block(Block::default().borders(Borders::ALL).title("Messages"))
@@ -221,6 +122,20 @@ fn main() {
             }
         };
 
+        read_log(
+            &mut reader,
+            &message_types,
+            &mut captured_messages,
+            &mut all_messages,
+        );
+    }
+
+    fn read_log(
+        reader: &mut BufReader<File>,
+        message_types: &[String],
+        captured_messages: &mut Vec<Vec<String>>,
+        all_messages: &mut Vec<String>,
+    ) {
         loop {
             let message = reader
                 .read_line()
@@ -233,7 +148,7 @@ fn main() {
 
             all_messages.push(message.clone());
 
-            for (index, message_type) in message_types.iter().enumerate() {                
+            for (index, message_type) in message_types.iter().enumerate() {
                 if message.contains(message_type) {
                     captured_messages[index].push(message.clone());
                 }
