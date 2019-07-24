@@ -6,12 +6,10 @@ mod ui;
 
 use failure::Error;
 use std::fs::File;
-use std::io;
-use std::io::BufReader;
+use std::io::{BufReader, Stdout, stdout};
 use termion::event::Key;
 use termion::input::TermRead;
-use termion::raw::IntoRawMode;
-use termion::raw::RawTerminal;
+use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
 use toml::Value;
 use tui::backend::TermionBackend;
@@ -126,13 +124,16 @@ fn main() -> Result<(), failure::Error> {
     }
 
     fn setup_terminal(
-    ) -> Result<Terminal<TermionBackend<AlternateScreen<RawTerminal<std::io::Stdout>>>>, Error>
+    ) -> Result<Terminal<TermionBackend<AlternateScreen<RawTerminal<Stdout>>>>, Error>
     {
-        let stdout = io::stdout().into_raw_mode()?;
+        let stdout = stdout().into_raw_mode()?;
         let stdout = AlternateScreen::from(stdout);
         let backend = TermionBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
 
-        Ok(Terminal::new(backend)?)
+        terminal.hide_cursor()?;
+
+        Ok(terminal)
     }
 
     Ok(())

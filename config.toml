@@ -1,2 +1,2 @@
-log_path = "../akka-poc/BonusEngine.Akka.Server/Log/log-20190723.txt"
-message_types = ["[DBG]", "[ERR]", "[INF]", "Wololo", "WageringActor"]
+log_path = "/mnt/akka-logs/server.out.log"
+message_types = ["[ERR]", "[DBG]", "[INF]"]
