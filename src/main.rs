@@ -164,8 +164,13 @@ fn main() {
     terminal.hide_cursor().unwrap();
 
     let events = Events::new();
-    let mut captured_messages: Vec<Vec<String>> = vec![vec![], vec![], vec![]];
+    let mut captured_messages: Vec<Vec<String>> = vec![];
+    let mut all_messages: Vec<String> = vec![];
 
+    for _ in 0..message_types.len() {
+        captured_messages.push(vec![]);
+    }
+    
     loop {
         terminal
             .draw(|mut f| {
@@ -179,6 +184,7 @@ fn main() {
                 Block::default()
                     .style(Style::default().bg(Color::White))
                     .render(&mut f, chunks[0]);
+
                 Tabs::default()
                     .block(Block::default().borders(Borders::ALL).title("Tabs"))
                     .titles(&app.tabs.titles)
@@ -186,11 +192,16 @@ fn main() {
                     .style(Style::default().fg(Color::Cyan))
                     .highlight_style(Style::default().fg(Color::Yellow))
                     .render(&mut f, chunks[0]);
+                                
+                let events = match app.tabs.index < message_types.len() {
+                    true => &captured_messages[app.tabs.index],
+                    false => &all_messages,
+                };
 
-                let events = captured_messages[app.tabs.index]
-                    .iter()
-                    .rev()
-                    .map(|evt| Text::styled(evt, Style::default().fg(Color::Yellow)));
+                let events = events
+                     .iter()
+                     .rev()
+                     .map(|evt| Text::styled(evt, Style::default().fg(Color::Indexed((app.tabs.index + 1) as u8))));
 
                 List::new(events)
                     .block(Block::default().borders(Borders::ALL).title("Messages"))
@@ -211,20 +222,20 @@ fn main() {
         };
 
         loop {
-            let event = reader
+            let message = reader
                 .read_line()
                 .expect("Failed reading file buffer")
                 .unwrap();
 
-            if event.is_empty() {
+            if message.is_empty() {
                 break;
             }
 
-            for (index, event_type) in message_types.iter().enumerate() {
-                if event.contains(event_type) {
-                    captured_messages[index].push(event);
+            all_messages.push(message.clone());
 
-                    break;
+            for (index, message_type) in message_types.iter().enumerate() {                
+                if message.contains(message_type) {
+                    captured_messages[index].push(message.clone());
                 }
             }
         }
