@@ -36,7 +36,7 @@ pub enum Event<I> {
 }
 
 pub struct Events {
-    rx: mpsc::Receiver<Event<Key>>
+    rx: mpsc::Receiver<Event<Key>>,
 }
 
 impl Default for Events {
@@ -96,9 +96,7 @@ impl Events {
             })
         };
 
-        Events {
-            rx
-        }
+        Events { rx }
     }
 
     pub fn next(&self) -> Result<Event<Key>, mpsc::RecvError> {

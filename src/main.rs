@@ -4,13 +4,14 @@ extern crate tui;
 
 mod ui;
 
+use failure::Error;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
 use termion::event::Key;
-use termion::input::MouseTerminal;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
+use termion::raw::RawTerminal;
 use termion::screen::AlternateScreen;
 use toml::Value;
 use tui::backend::TermionBackend;
@@ -28,7 +29,7 @@ struct App<'a> {
     tabs: TabsState<'a>,
 }
 
-fn main() {
+fn main() -> Result<(), failure::Error> {
     let config = std::fs::read_to_string(CONFIG_FILE_NAME)
         .expect("Failed loading config file")
         .parse::<Value>()
@@ -53,13 +54,7 @@ fn main() {
         tabs: TabsState::new(tabs),
     };
 
-    let stdout = io::stdout().into_raw_mode().unwrap();
-    let stdout = MouseTerminal::from(stdout);
-    let stdout = AlternateScreen::from(stdout);
-    let backend = TermionBackend::new(stdout);
-    let mut terminal = Terminal::new(backend).unwrap();
-
-    terminal.hide_cursor().unwrap();
+    let mut terminal = setup_terminal()?;
 
     let events = Events::new();
     let mut captured_messages: Vec<Vec<String>> = vec![];
@@ -130,28 +125,40 @@ fn main() {
         );
     }
 
-    fn read_log(
-        reader: &mut BufReader<File>,
-        message_types: &[String],
-        captured_messages: &mut Vec<Vec<String>>,
-        all_messages: &mut Vec<String>,
-    ) {
-        loop {
-            let message = reader
-                .read_line()
-                .expect("Failed reading file buffer")
-                .unwrap();
+    fn setup_terminal(
+    ) -> Result<Terminal<TermionBackend<AlternateScreen<RawTerminal<std::io::Stdout>>>>, Error>
+    {
+        let stdout = io::stdout().into_raw_mode()?;
+        let stdout = AlternateScreen::from(stdout);
+        let backend = TermionBackend::new(stdout);
 
-            if message.is_empty() {
-                break;
-            }
+        Ok(Terminal::new(backend)?)
+    }
 
-            all_messages.push(message.clone());
+    Ok(())
+}
 
-            for (index, message_type) in message_types.iter().enumerate() {
-                if message.contains(message_type) {
-                    captured_messages[index].push(message.clone());
-                }
+fn read_log(
+    reader: &mut BufReader<File>,
+    message_types: &[String],
+    captured_messages: &mut Vec<Vec<String>>,
+    all_messages: &mut Vec<String>,
+) {
+    loop {
+        let message = reader
+            .read_line()
+            .expect("Failed reading file buffer")
+            .unwrap();
+
+        if message.is_empty() {
+            break;
+        }
+
+        all_messages.push(message.clone());
+
+        for (index, message_type) in message_types.iter().enumerate() {
+            if message.contains(message_type) {
+                captured_messages[index].push(message.clone());
             }
         }
     }
