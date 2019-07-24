@@ -5,8 +5,12 @@ extern crate tui;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 use termion::event::Key;
 use termion::input::MouseTerminal;
+use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 use toml::Value;
@@ -16,28 +20,17 @@ use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Tabs, Text, Widget};
 use tui::Terminal;
 
-use std::sync::mpsc;
-use std::thread;
-use std::time::Duration;
-use termion::input::TermRead;
-
 const CONFIG_FILE_NAME: &str = "config.toml";
-const CONFIG_LOG_PATH_PROPERTY: &str = "log_path";
-
-enum LogEvent {
-    Error,
-    Debug,
-    Info,
-    Unknown,
-}
+const CONFIG_LOG_PATH_TOML_PROPERTY: &str = "log_path";
+const MESSAGE_TYPES_TOML_PROPERTY: &str = "message_types";
 
 struct App<'a> {
     tabs: TabsState<'a>,
 }
 
 pub struct TabsState<'a> {
-    pub titles: Vec<&'a str>,
-    pub index: usize,
+    titles: Vec<&'a str>,
+    index: usize,
 }
 
 impl<'a> TabsState<'a> {
@@ -138,6 +131,30 @@ impl Events {
 }
 
 fn main() {
+    let config = std::fs::read_to_string(CONFIG_FILE_NAME)
+        .expect("Failed loading config file")
+        .parse::<Value>()
+        .expect("Failed loading config values");
+
+    let log_path = config[CONFIG_LOG_PATH_TOML_PROPERTY]
+        .as_str()
+        .expect("Failed loading config value log_path");
+
+    let message_types = config[MESSAGE_TYPES_TOML_PROPERTY]
+        .clone()
+        .try_into::<Vec<String>>()
+        .expect("Failed loading config value captured_events");
+
+    let file = File::open(log_path).expect("Failed opening file");
+    let mut reader = BufReader::new(file);
+
+    let mut tabs: Vec<&str> = message_types.iter().map(AsRef::as_ref).collect();
+    tabs.push("All");
+
+    let mut app = App {
+        tabs: TabsState::new(tabs),
+    };
+
     let stdout = io::stdout().into_raw_mode().unwrap();
     let stdout = MouseTerminal::from(stdout);
     let stdout = AlternateScreen::from(stdout);
@@ -147,25 +164,7 @@ fn main() {
     terminal.hide_cursor().unwrap();
 
     let events = Events::new();
-    let mut error_messages: Vec<String> = vec![];
-    let mut info_messages: Vec<String> = vec![];
-    let mut debug_messages: Vec<String> = vec![];
-
-    let mut app = App {
-        tabs: TabsState::new(vec!["All", "Info", "Debug", "Error"]),
-    };
-
-    let config = std::fs::read_to_string(CONFIG_FILE_NAME)
-        .expect("Failed loading config file")
-        .parse::<Value>()
-        .expect("Failed loading config values");
-
-    let log_path = config[CONFIG_LOG_PATH_PROPERTY]
-        .as_str()
-        .expect("Failed loading config value log_path");
-
-    let file = File::open(log_path).expect("Failed opening file");
-    let mut reader = BufReader::new(file);
+    let mut captured_messages: Vec<Vec<String>> = vec![vec![], vec![], vec![]];
 
     loop {
         terminal
@@ -174,7 +173,7 @@ fn main() {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .margin(5)
-                    .constraints([Constraint::Percentage(15), Constraint::Percentage(100)].as_ref())
+                    .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
                     .split(size);
 
                 Block::default()
@@ -188,31 +187,15 @@ fn main() {
                     .highlight_style(Style::default().fg(Color::Yellow))
                     .render(&mut f, chunks[0]);
 
-                let events = debug_messages
+                let events = captured_messages[app.tabs.index]
                     .iter()
                     .rev()
                     .map(|evt| Text::styled(evt, Style::default().fg(Color::Yellow)));
 
                 List::new(events)
-                    .block(Block::default().borders(Borders::ALL).title("List"))
+                    .block(Block::default().borders(Borders::ALL).title("Messages"))
                     .start_corner(Corner::BottomLeft)
                     .render(&mut f, chunks[1]);
-
-                match app.tabs.index {
-                    0 => Block::default()
-                        .borders(Borders::ALL)
-                        .render(&mut f, chunks[1]),
-                    1 => Block::default()
-                        .borders(Borders::ALL)
-                        .render(&mut f, chunks[1]),
-                    2 => Block::default()
-                        .borders(Borders::ALL)
-                        .render(&mut f, chunks[1]),
-                    3 => Block::default()
-                        .borders(Borders::ALL)
-                        .render(&mut f, chunks[1]),
-                    _ => {}
-                }
             })
             .unwrap();
 
@@ -237,34 +220,13 @@ fn main() {
                 break;
             }
 
-            match get_event_type(&event) {
-                LogEvent::Debug => {
-                    debug_messages.push(event);
+            for (index, event_type) in message_types.iter().enumerate() {
+                if event.contains(event_type) {
+                    captured_messages[index].push(event);
+
+                    break;
                 }
-                LogEvent::Info => {
-                    info_messages.push(event);
-                }
-                LogEvent::Error => {
-                    error_messages.push(event);
-                }
-                LogEvent::Unknown => continue,
             }
         }
     }
-}
-
-fn get_event_type(event: &str) -> LogEvent {
-    if event.contains("[DBG]") {
-        return LogEvent::Debug;
-    }
-
-    if event.contains("[INF]") {
-        return LogEvent::Info;
-    }
-
-    if event.contains("[ERR]") {
-        return LogEvent::Error;
-    }
-
-    LogEvent::Unknown
 }
