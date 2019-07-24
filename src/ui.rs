@@ -14,15 +14,13 @@ pub struct TabsState<'a> {
 }
 
 impl<'a> TabsState<'a> {
-    pub fn new(titles: Vec<&'a str>) -> TabsState {
-        let mut final_titles = vec!["All"];
-        final_titles.extend_from_slice(&titles);
-
-        TabsState {
-            titles: final_titles,
+    pub fn new(titles: &[&'a str]) -> Self {
+        Self {
+            titles: [&["All"][..], titles].concat(),
             index: 0,
         }
     }
+
     pub fn next(&mut self) {
         self.index = (self.index + 1) % self.titles.len();
     }

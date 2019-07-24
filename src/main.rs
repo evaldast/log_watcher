@@ -39,15 +39,13 @@ fn main() -> Result<(), failure::Error> {
 
     let file = File::open(log_path).expect("Failed opening file");
     let mut reader = BufReader::new(file);
-
     let tabs: Vec<&str> = message_types.iter().map(AsRef::as_ref).collect();
 
     let mut app = App {
-        tabs: TabsState::new(tabs),
+        tabs: TabsState::new(&tabs),
     };
 
     let mut terminal = setup_terminal()?;
-
     let events = Events::new();
     let mut captured_messages: Vec<Vec<String>> = vec![];
 
@@ -151,7 +149,7 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
 fn read_log(
     reader: &mut BufReader<File>,
     message_types: &[String],
-    captured_messages: &mut Vec<Vec<String>>,
+    captured_messages: &mut [Vec<String>],
 ) {
     loop {
         let message = reader
