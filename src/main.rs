@@ -21,7 +21,8 @@ use ui::{Event, Events, TabsState};
 
 const CONFIG_FILE_NAME: &str = "config.toml";
 const CONFIG_LOG_PATH_TOML_PROPERTY: &str = "log_path";
-const MESSAGE_TYPES_TOML_PROPERTY: &str = "message_types";
+const MESSAGE_FILTERS_TOML_PROPERTY: &str = "message_filters";
+const ALL_MESSAGES_INDEX: usize = 0;
 
 struct App<'a> {
     tabs: TabsState<'a>,
@@ -29,13 +30,13 @@ struct App<'a> {
 
 struct Config {
     log_path: String,
-    message_types: Vec<String>,
+    message_filters: Vec<String>,
 }
 
 fn main() -> Result<(), failure::Error> {
     let config = load_config()?;
     let log_path = config.log_path;
-    let message_types = config.message_types;
+    let message_types = config.message_filters;
 
     let file = File::open(log_path).expect("Failed opening file");
     let mut reader = BufReader::new(file);
@@ -47,7 +48,7 @@ fn main() -> Result<(), failure::Error> {
 
     let mut terminal = setup_terminal()?;
     let events = Events::new();
-    let mut captured_messages: Vec<Vec<String>> = vec![];
+    let mut captured_messages: Vec<Vec<tui::widgets::Text>> = vec![];
 
     for _ in 0..=message_types.len() {
         captured_messages.push(vec![]);
@@ -74,14 +75,7 @@ fn main() -> Result<(), failure::Error> {
                 .highlight_style(Style::default().fg(Color::Yellow))
                 .render(&mut f, chunks[0]);
 
-            let events = captured_messages[app.tabs.index].iter().rev().map(|evt| {
-                Text::styled(
-                    evt,
-                    Style::default().fg(Color::Indexed((app.tabs.index + 1) as u8)),
-                )
-            });
-
-            List::new(events)
+            List::new(captured_messages[app.tabs.index].iter().rev().cloned())
                 .block(Block::default().borders(Borders::ALL).title("Messages"))
                 .start_corner(Corner::BottomLeft)
                 .render(&mut f, chunks[1]);
@@ -108,14 +102,14 @@ fn load_config() -> Result<Config, Error> {
         .as_str()
         .expect("Failed loading config value log_path");
 
-    let message_types = config[MESSAGE_TYPES_TOML_PROPERTY]
+    let message_filters = config[MESSAGE_FILTERS_TOML_PROPERTY]
         .clone()
         .try_into::<Vec<String>>()
         .expect("Failed loading config value captured_events");
 
     Ok(Config {
         log_path: log_path.to_string(),
-        message_types,
+        message_filters,
     })
 }
 
@@ -132,7 +126,7 @@ fn setup_terminal() -> Result<Terminal<TermionBackend<AlternateScreen<RawTermina
 }
 
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
-    if let Event::Input(input) = events.next().unwrap() {
+    if let Event::Input(input) = events.next()? {
         match input {
             Key::Char('q') => {
                 failure::bail!("User called Quit");
@@ -149,7 +143,7 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
 fn read_log(
     reader: &mut BufReader<File>,
     message_types: &[String],
-    captured_messages: &mut [Vec<String>],
+    captured_messages: &mut [Vec<tui::widgets::Text>],
 ) {
     loop {
         let message = reader
@@ -157,16 +151,30 @@ fn read_log(
             .expect("Failed reading file buffer")
             .unwrap();
 
+        let mut message_captured = false;
+
         if message.is_empty() {
             break;
-        }
-
-        captured_messages[0].push(message.clone());
+        }        
 
         for (index, message_type) in message_types.iter().enumerate() {
             if message.contains(message_type) {
-                captured_messages[index + 1].push(message.clone());
+                let styled = Text::styled(
+                    message.clone(),
+                    Style::default().fg(Color::Indexed((index + 1) as u8)),
+                );
+
+                captured_messages[index + 1].push(styled.clone());
+                captured_messages[ALL_MESSAGES_INDEX].push(styled);
+
+                message_captured = true;
             }
+        }
+
+        if !message_captured {
+            let styled = Text::styled(message.clone(), Style::default().fg(Color::White));
+
+            captured_messages[ALL_MESSAGES_INDEX].push(styled);
         }
     }
 }

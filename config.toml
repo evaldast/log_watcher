@@ -1,2 +1,2 @@
 log_path = "/mnt/akka-logs/server.out.log"
-message_types = ["[ERR]", "[DBG]", "[INF]"]
+message_filters = ["[ERR]", "[INF]", "[DBG]"]
