@@ -8,7 +8,6 @@ use failure::Error;
 use std::fs::File;
 use std::io::{stdout, BufReader, Stdout};
 use termion::event::Key;
-use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
 use toml::Value;
@@ -48,48 +47,17 @@ fn main() -> Result<(), failure::Error> {
 
     let mut terminal = setup_terminal()?;
     let events = Events::new();
-    let mut captured_messages: Vec<Vec<tui::widgets::Text>> = vec![];
+    let mut captured_messages: Vec<Vec<Text>> = vec![];
 
     for _ in 0..=message_types.len() {
         captured_messages.push(vec![]);
     }
 
     loop {
-        terminal.draw(|mut f| {
-            let size = f.size();
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(5)
-                .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
-                .split(size);
-
-            Block::default()
-                .style(Style::default().bg(Color::White))
-                .render(&mut f, chunks[0]);
-
-            Tabs::default()
-                .block(Block::default().borders(Borders::ALL).title("Tabs"))
-                .titles(&app.tabs.titles)
-                .select(app.tabs.index)
-                .style(Style::default().fg(Color::Cyan))
-                .highlight_style(Style::default().fg(Color::Yellow))
-                .render(&mut f, chunks[0]);
-
-            List::new(captured_messages[app.tabs.index].iter().rev().cloned())
-                .block(Block::default().borders(Borders::ALL).title("Messages"))
-                .start_corner(Corner::BottomLeft)
-                .render(&mut f, chunks[1]);
-        })?;
-
-        match read_user_input(&events, &mut app) {
-            Ok(_) => {}
-            Err(_) => break,
-        }
-
+        draw_ui(&mut terminal, &app, &captured_messages)?;
+        read_user_input(&events, &mut app)?;
         read_log(&mut reader, &message_types, &mut captured_messages);
     }
-
-    Ok(())
 }
 
 fn load_config() -> Result<Config, Error> {
@@ -125,6 +93,38 @@ fn setup_terminal() -> Result<Terminal<TermionBackend<AlternateScreen<RawTermina
     Ok(terminal)
 }
 
+fn draw_ui(
+    terminal: &mut Terminal<TermionBackend<AlternateScreen<RawTerminal<Stdout>>>>,
+    app: &App,
+    captured_messages: &[Vec<Text>],
+) -> Result<(), std::io::Error> {
+    terminal.draw(|mut f| {
+        let size = f.size();
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(5)
+            .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
+            .split(size);
+
+        Block::default()
+            .style(Style::default().bg(Color::White))
+            .render(&mut f, chunks[0]);
+
+        Tabs::default()
+            .block(Block::default().borders(Borders::ALL).title("Tabs"))
+            .titles(&app.tabs.titles)
+            .select(app.tabs.index)
+            .style(Style::default().fg(Color::Cyan))
+            .highlight_style(Style::default().fg(Color::Yellow))
+            .render(&mut f, chunks[0]);
+
+        List::new(captured_messages[app.tabs.index].iter().rev().cloned())
+            .block(Block::default().borders(Borders::ALL).title("Messages"))
+            .start_corner(Corner::BottomLeft)
+            .render(&mut f, chunks[1]);
+    })
+}
+
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
@@ -143,38 +143,39 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
 fn read_log(
     reader: &mut BufReader<File>,
     message_types: &[String],
-    captured_messages: &mut [Vec<tui::widgets::Text>],
+    captured_messages: &mut [Vec<Text>],
 ) {
-    loop {
-        let message = reader
-            .read_line()
-            .expect("Failed reading file buffer")
-            .unwrap();
+    use termion::input::TermRead;
 
-        let mut message_captured = false;
-
+    while let Some(message) = reader.read_line().expect("Failed reading line") {
         if message.is_empty() {
             break;
-        }        
-
-        for (index, message_type) in message_types.iter().enumerate() {
-            if message.contains(message_type) {
-                let styled = Text::styled(
-                    message.clone(),
-                    Style::default().fg(Color::Indexed((index + 1) as u8)),
-                );
-
-                captured_messages[index + 1].push(styled.clone());
-                captured_messages[ALL_MESSAGES_INDEX].push(styled);
-
-                message_captured = true;
-            }
         }
 
-        if !message_captured {
-            let styled = Text::styled(message.clone(), Style::default().fg(Color::White));
+        capture_message(message_types, captured_messages, &message);
+    }
+}
 
+fn capture_message(message_types: &[String], captured_messages: &mut [Vec<Text>], message: &str) {
+    let mut message_captured = false;
+
+    for (index, message_type) in message_types.iter().enumerate() {
+        if message.contains(message_type) {
+            let styled = Text::styled(
+                message.to_string(),
+                Style::default().fg(Color::Indexed((index + 1) as u8)),
+            );
+
+            captured_messages[index + 1].push(styled.clone());
             captured_messages[ALL_MESSAGES_INDEX].push(styled);
+
+            message_captured = true;
         }
+    }
+
+    if !message_captured {
+        let styled = Text::styled(message.to_string(), Style::default().fg(Color::White));
+
+        captured_messages[ALL_MESSAGES_INDEX].push(styled);
     }
 }
