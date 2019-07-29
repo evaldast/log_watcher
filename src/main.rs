@@ -12,9 +12,9 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
 use toml::Value;
 use tui::backend::TermionBackend;
-use tui::layout::{Constraint, Corner, Direction, Layout};
+use tui::layout::{Alignment, Constraint, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders, List, Tabs, Text, Widget};
+use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
 use ui::{Event, Events, TabsState};
 
@@ -118,9 +118,10 @@ fn draw_ui(
             .highlight_style(Style::default().fg(Color::Yellow))
             .render(&mut f, chunks[0]);
 
-        List::new(captured_messages[app.tabs.index].iter().rev().cloned())
+        Paragraph::new(captured_messages[app.tabs.index].iter().rev())
             .block(Block::default().borders(Borders::ALL).title("Messages"))
-            .start_corner(Corner::BottomLeft)
+            .alignment(Alignment::Left)
+            .wrap(true)
             .render(&mut f, chunks[1]);
     })
 }
@@ -147,10 +148,12 @@ fn read_log(
 ) {
     use termion::input::TermRead;
 
-    while let Some(message) = reader.read_line().expect("Failed reading line") {
+    while let Some(mut message) = reader.read_line().expect("Failed reading line") {
         if message.is_empty() {
             break;
         }
+
+        message.push('\n');
 
         capture_message(message_types, captured_messages, &message);
     }
