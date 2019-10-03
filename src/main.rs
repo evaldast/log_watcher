@@ -12,11 +12,11 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
 use toml::Value;
 use tui::backend::TermionBackend;
-use tui::layout::{Alignment, Constraint, Direction, Layout};
+use tui::layout::{Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
+use tui::widgets::{Block, Borders, List, Tabs, Text, Widget};
 use tui::Terminal;
-use ui::{Event, Events, TabsState};
+use ui::{Event, Events, TabsState, WindowState};
 
 const CONFIG_FILE_NAME: &str = "config.toml";
 const CONFIG_LOG_PATH_TOML_PROPERTY: &str = "log_path";
@@ -25,6 +25,7 @@ const ALL_MESSAGES_INDEX: usize = 0;
 
 struct App<'a> {
     tabs: TabsState<'a>,
+    messages_window: WindowState<'a>,
 }
 
 struct Config {
@@ -43,6 +44,7 @@ fn main() -> Result<(), failure::Error> {
 
     let mut app = App {
         tabs: TabsState::new(&tabs),
+        messages_window: WindowState::new(),
     };
 
     let mut terminal = setup_terminal()?;
@@ -54,9 +56,9 @@ fn main() -> Result<(), failure::Error> {
     }
 
     loop {
-        draw_ui(&mut terminal, &app, &captured_messages)?;
         read_user_input(&events, &mut app)?;
         read_log(&mut reader, &message_types, &mut captured_messages);
+        draw_ui(&mut terminal, &mut app, &captured_messages)?;
     }
 }
 
@@ -93,18 +95,17 @@ fn setup_terminal() -> Result<Terminal<TermionBackend<AlternateScreen<RawTermina
     Ok(terminal)
 }
 
-fn draw_ui(
+fn draw_ui<'a>(
     terminal: &mut Terminal<TermionBackend<AlternateScreen<RawTerminal<Stdout>>>>,
-    app: &App,
-    captured_messages: &[Vec<Text>],
+    app: &mut App<'a>,
+    captured_messages: &[Vec<Text<'a>>],
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
-        let size = f.size();
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(5)
             .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
-            .split(size);
+            .split(f.size());
 
         Block::default()
             .style(Style::default().bg(Color::White))
@@ -118,10 +119,14 @@ fn draw_ui(
             .highlight_style(Style::default().fg(Color::Yellow))
             .render(&mut f, chunks[0]);
 
-        Paragraph::new(captured_messages[app.tabs.index].iter().rev())
+        app.messages_window.display_lines(
+            &captured_messages[app.tabs.index],
+            chunks[1].height as usize,
+        );
+
+        List::new(app.messages_window.lines.iter().cloned())
             .block(Block::default().borders(Borders::ALL).title("Messages"))
-            .alignment(Alignment::Left)
-            .wrap(true)
+            .start_corner(Corner::BottomLeft)
             .render(&mut f, chunks[1]);
     })
 }
@@ -134,6 +139,8 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
             }
             Key::Right => app.tabs.next(),
             Key::Left => app.tabs.previous(),
+            Key::Up => app.messages_window.previous(),
+            Key::Down => app.messages_window.next(),
             _ => {}
         }
     };
@@ -148,12 +155,10 @@ fn read_log(
 ) {
     use termion::input::TermRead;
 
-    while let Some(mut message) = reader.read_line().expect("Failed reading line") {
+    while let Some(message) = reader.read_line().expect("Failed reading line") {
         if message.is_empty() {
             break;
         }
-
-        message.push('\n');
 
         capture_message(message_types, captured_messages, &message);
     }

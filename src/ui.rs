@@ -7,10 +7,18 @@ use std::thread;
 use std::time::Duration;
 use termion::event::Key;
 use termion::input::TermRead;
+use tui::style::{Modifier, Style};
+use tui::widgets::Text;
 
 pub struct TabsState<'a> {
     pub titles: Vec<&'a str>,
     pub index: usize,
+}
+
+pub struct WindowState<'a> {
+    pub lines: Vec<Text<'a>>,
+    pub height: usize,    
+    pub selected_line_index: usize,
 }
 
 impl<'a> TabsState<'a> {
@@ -31,6 +39,46 @@ impl<'a> TabsState<'a> {
         } else {
             self.index = self.titles.len() - 1;
         }
+    }
+}
+
+impl<'a> WindowState<'a> {
+    pub fn new() -> Self {
+        Self {
+            lines: vec![],
+            height: 0,            
+            selected_line_index: 0,
+        }
+    }    
+
+    pub fn next(&mut self) {
+        if self.selected_line_index > 0 {
+            self.selected_line_index -= 1;
+        } else {
+            self.selected_line_index = self.height - 1;
+        }
+    }
+
+    pub fn previous(&mut self) {
+        self.selected_line_index = (self.selected_line_index + 1) % self.height;
+    }
+
+    pub fn display_lines(&mut self, lines: &[Text<'a>], window_height: usize) {
+        self.height = window_height - 2;
+
+        let mut lines: Vec<Text<'a>> = lines.iter().rev().take(self.height).cloned().collect();
+
+        match &lines[self.selected_line_index] {
+            Text::Styled(cow, _) => {
+                lines[self.selected_line_index] = Text::styled(
+                    cow.to_string(),
+                    Style::default().modifier(Modifier::REVERSED),
+                )
+            }
+            _ => println!("no"),
+        };
+
+        self.lines = lines;
     }
 }
 
