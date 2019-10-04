@@ -12,9 +12,9 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
 use toml::Value;
 use tui::backend::TermionBackend;
-use tui::layout::{Constraint, Corner, Direction, Layout};
+use tui::layout::{Alignment, Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders, List, Tabs, Text, Widget};
+use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
 use ui::{Event, Events, TabsState, WindowState};
 
@@ -101,10 +101,22 @@ fn draw_ui<'a>(
     captured_messages: &[Vec<Text<'a>>],
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
+        let is_alternate_view = app.messages_window.line_is_selected;
+
+        let constraints = match is_alternate_view {
+            true => [
+                Constraint::Length(3),
+                Constraint::Percentage(80),
+                Constraint::Percentage(20),
+            ]
+            .as_ref(),
+            false => [Constraint::Length(3), Constraint::Percentage(100)].as_ref(),
+        };
+
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(5)
-            .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
+            .constraints(constraints)
             .split(f.size());
 
         Block::default()
@@ -128,6 +140,16 @@ fn draw_ui<'a>(
             .block(Block::default().borders(Borders::ALL).title("Messages"))
             .start_corner(Corner::BottomLeft)
             .render(&mut f, chunks[1]);
+
+        if app.messages_window.line_is_selected {
+            let selected_line = app.messages_window.selected_line.as_ref().unwrap();
+
+            Paragraph::new([selected_line].iter().cloned())
+                .block(Block::default().borders(Borders::ALL).title("Selected"))
+                .alignment(Alignment::Left)
+                .wrap(true)
+                .render(&mut f, chunks[2]);
+        }
     })
 }
 

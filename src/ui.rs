@@ -17,8 +17,10 @@ pub struct TabsState<'a> {
 
 pub struct WindowState<'a> {
     pub lines: Vec<Text<'a>>,
-    pub height: usize,    
+    pub height: usize,
+    pub line_is_selected: bool,
     pub selected_line_index: usize,
+    pub selected_line: Option<Text<'a>>,
 }
 
 impl<'a> TabsState<'a> {
@@ -46,12 +48,16 @@ impl<'a> WindowState<'a> {
     pub fn new() -> Self {
         Self {
             lines: vec![],
-            height: 0,            
+            height: 0,
+            line_is_selected: false,
             selected_line_index: 0,
+            selected_line: None,
         }
-    }    
+    }
 
     pub fn next(&mut self) {
+        self.line_is_selected = true;
+
         if self.selected_line_index > 0 {
             self.selected_line_index -= 1;
         } else {
@@ -60,6 +66,7 @@ impl<'a> WindowState<'a> {
     }
 
     pub fn previous(&mut self) {
+        self.line_is_selected = true;
         self.selected_line_index = (self.selected_line_index + 1) % self.height;
     }
 
@@ -68,15 +75,24 @@ impl<'a> WindowState<'a> {
 
         let mut lines: Vec<Text<'a>> = lines.iter().rev().take(self.height).cloned().collect();
 
-        match &lines[self.selected_line_index] {
-            Text::Styled(cow, _) => {
-                lines[self.selected_line_index] = Text::styled(
-                    cow.to_string(),
-                    Style::default().modifier(Modifier::REVERSED),
-                )
-            }
-            _ => println!("no"),
-        };
+        if self.line_is_selected {
+            match &lines[self.selected_line_index] {
+                Text::Styled(cow, style) => {
+                    let text_value = cow.to_string();
+                    let style_value = *style;
+
+                    lines[self.selected_line_index] = Text::styled(
+                        text_value.clone(),
+                        Style::default().modifier(Modifier::REVERSED),
+                    );
+
+                    if self.line_is_selected {
+                        self.selected_line = Some(Text::styled(text_value, style_value));
+                    }
+                }
+                _ => {}
+            };
+        }
 
         self.lines = lines;
     }
