@@ -156,11 +156,9 @@ fn draw_ui<'a>(
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
-            Key::Char('q') => {
-                failure::bail!("User called Quit");
-            }
-            Key::Right => app.tabs.next(),
-            Key::Left => app.tabs.previous(),
+            Key::Char('q') => failure::bail!("User called Quit"),
+            Key::Right => switch_tab(app, true),
+            Key::Left => switch_tab(app, false),
             Key::Up => app.messages_window.previous(),
             Key::Down => app.messages_window.next(),
             _ => {}
@@ -207,5 +205,15 @@ fn capture_message(message_types: &[String], captured_messages: &mut [Vec<Text>]
         let styled = Text::styled(message.to_string(), Style::default().fg(Color::White));
 
         captured_messages[ALL_MESSAGES_INDEX].push(styled);
+    }
+}
+
+fn switch_tab(app: &mut App, is_next: bool) {
+    app.messages_window.reset();
+
+    if is_next {
+        app.tabs.next();
+    } else {
+        app.tabs.previous();
     }
 }

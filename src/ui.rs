@@ -32,7 +32,6 @@ impl<'a> TabsState<'a> {
     }
 
     pub fn next(&mut self) {
-        //self.line_is_selected = false;
         self.index = (self.index + 1) % self.titles.len();
     }
 
@@ -56,7 +55,7 @@ impl<'a> WindowState<'a> {
         }
     }
 
-    pub fn next(&mut self) {        
+    pub fn next(&mut self) {
         if self.selected_line_index > 0 {
             self.selected_line_index -= 1;
         }
@@ -65,11 +64,9 @@ impl<'a> WindowState<'a> {
     pub fn previous(&mut self) {
         match self.line_is_selected {
             true => {
-                if self.lines.len() > self.height {
-                    self.selected_line_index = (self.selected_line_index + 1) % self.height
-                } else {
-                    self.selected_line_index = (self.selected_line_index + 1) % self.lines.len()
-                }
+                if self.selected_line_index + 1 < self.lines.len() {
+                    self.selected_line_index += 1;
+                }                
             }
             false => self.line_is_selected = true,
         }
@@ -102,12 +99,9 @@ impl<'a> WindowState<'a> {
         self.lines = lines;
     }
 
-    fn increment_line_index(&mut self) {
-        if self.lines.len() > self.height {
-            self.selected_line_index = (self.selected_line_index + 1) % self.height
-        } else {
-            self.selected_line_index = (self.selected_line_index + 1) % self.lines.len()
-        }
+    pub fn reset(&mut self) {
+        self.line_is_selected = false;
+        self.selected_line_index = 0;
     }
 }
 
