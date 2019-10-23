@@ -32,6 +32,7 @@ impl<'a> TabsState<'a> {
     }
 
     pub fn next(&mut self) {
+        //self.line_is_selected = false;
         self.index = (self.index + 1) % self.titles.len();
     }
 
@@ -55,19 +56,23 @@ impl<'a> WindowState<'a> {
         }
     }
 
-    pub fn next(&mut self) {
-        self.line_is_selected = true;
-
+    pub fn next(&mut self) {        
         if self.selected_line_index > 0 {
             self.selected_line_index -= 1;
-        } else {
-            self.selected_line_index = self.height - 1;
         }
     }
 
     pub fn previous(&mut self) {
-        self.line_is_selected = true;
-        self.selected_line_index = (self.selected_line_index + 1) % self.height;
+        match self.line_is_selected {
+            true => {
+                if self.lines.len() > self.height {
+                    self.selected_line_index = (self.selected_line_index + 1) % self.height
+                } else {
+                    self.selected_line_index = (self.selected_line_index + 1) % self.lines.len()
+                }
+            }
+            false => self.line_is_selected = true,
+        }
     }
 
     pub fn display_lines(&mut self, lines: &[Text<'a>], window_height: usize) {
@@ -96,6 +101,14 @@ impl<'a> WindowState<'a> {
 
         self.lines = lines;
     }
+
+    fn increment_line_index(&mut self) {
+        if self.lines.len() > self.height {
+            self.selected_line_index = (self.selected_line_index + 1) % self.height
+        } else {
+            self.selected_line_index = (self.selected_line_index + 1) % self.lines.len()
+        }
+    }
 }
 
 pub enum Event<I> {
@@ -123,7 +136,7 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             exit_key: Key::Char('q'),
-            tick_rate: Duration::from_millis(250),
+            tick_rate: Duration::from_millis(100),
         }
     }
 }
