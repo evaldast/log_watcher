@@ -1,2 +1,2 @@
-log_path = "/test.txt"
+log_path = "/home/evaldas/test.txt"
 message_filters = ["[ERR]", "[INF]", "[DBG]", "[WRN]"]

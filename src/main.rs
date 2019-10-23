@@ -103,14 +103,15 @@ fn draw_ui<'a>(
     terminal.draw(|mut f| {
         let is_alternate_view = app.messages_window.line_is_selected;
 
-        let constraints = match is_alternate_view {
-            true => [
+        let constraints = if is_alternate_view {
+            [
                 Constraint::Length(3),
                 Constraint::Percentage(80),
                 Constraint::Percentage(20),
             ]
-            .as_ref(),
-            false => [Constraint::Length(3), Constraint::Percentage(100)].as_ref(),
+            .as_ref()
+        } else {
+            [Constraint::Length(3), Constraint::Percentage(100)].as_ref()
         };
 
         let chunks = Layout::default()
