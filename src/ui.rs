@@ -25,6 +25,11 @@ pub struct WindowState<'a> {
     pub selected_line: Option<Text<'a>>,
 }
 
+pub struct SearchState {
+    pub is_initiated: bool,
+    pub input: String,
+}
+
 impl<'a> TabsState<'a> {
     pub fn new(titles: &[&'a str]) -> Self {
         Self {
@@ -80,7 +85,7 @@ impl<'a> WindowState<'a> {
             self.selected_line_index - self.height + 1
         };
 
-        let displayed_line_amount = skipped_line_amount + self.height + 1;        
+        let displayed_line_amount = skipped_line_amount + self.height + 1;
 
         let mut lines: Vec<Text<'a>> = lines
             .iter()
@@ -117,6 +122,23 @@ impl<'a> WindowState<'a> {
     }
 }
 
+impl SearchState {
+    pub fn new() -> Self {
+        Self {
+            is_initiated: false,
+            input: String::new(),
+        }
+    }
+
+    pub fn search(&mut self) {
+        self.is_initiated = true;
+    }
+
+    pub fn close(&mut self) {
+        self.is_initiated = false;
+    }
+}
+
 pub enum Event<I> {
     Input(I),
     Tick,
@@ -134,14 +156,12 @@ impl Default for Events {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
-    pub exit_key: Key,
     pub tick_rate: Duration,
 }
 
 impl Default for Config {
     fn default() -> Config {
         Config {
-            exit_key: Key::Char('q'),
             tick_rate: Duration::from_millis(100),
         }
     }
@@ -162,9 +182,6 @@ impl Events {
                 for evt in stdin.keys() {
                     if let Ok(key) = evt {
                         if tx.send(Event::Input(key)).is_err() {
-                            return;
-                        }
-                        if key == config.exit_key {
                             return;
                         }
                     }
