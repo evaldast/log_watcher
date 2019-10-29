@@ -12,11 +12,11 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
 use toml::Value;
 use tui::backend::TermionBackend;
-use tui::layout::{Alignment, Constraint, Direction, Layout};
+use tui::layout::{Alignment, Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
+use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
-use ui::{Event, Events, TabsState};
+use ui::{Event, Events, TabsState, WindowState};
 
 const CONFIG_FILE_NAME: &str = "config.toml";
 const CONFIG_LOG_PATH_TOML_PROPERTY: &str = "log_path";
@@ -25,6 +25,7 @@ const ALL_MESSAGES_INDEX: usize = 0;
 
 struct App<'a> {
     tabs: TabsState<'a>,
+    messages_window: WindowState<'a>,
 }
 
 struct Config {
@@ -43,6 +44,7 @@ fn main() -> Result<(), failure::Error> {
 
     let mut app = App {
         tabs: TabsState::new(&tabs),
+        messages_window: WindowState::new(),
     };
 
     let mut terminal = setup_terminal()?;
@@ -54,9 +56,9 @@ fn main() -> Result<(), failure::Error> {
     }
 
     loop {
-        draw_ui(&mut terminal, &app, &captured_messages)?;
         read_user_input(&events, &mut app)?;
         read_log(&mut reader, &message_types, &mut captured_messages);
+        draw_ui(&mut terminal, &mut app, &captured_messages)?;
     }
 }
 
@@ -93,18 +95,30 @@ fn setup_terminal() -> Result<Terminal<TermionBackend<AlternateScreen<RawTermina
     Ok(terminal)
 }
 
-fn draw_ui(
+fn draw_ui<'a>(
     terminal: &mut Terminal<TermionBackend<AlternateScreen<RawTerminal<Stdout>>>>,
-    app: &App,
-    captured_messages: &[Vec<Text>],
+    app: &mut App<'a>,
+    captured_messages: &[Vec<Text<'a>>],
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
-        let size = f.size();
+        let is_alternate_view = app.messages_window.line_is_selected;
+
+        let constraints = if is_alternate_view {
+            [
+                Constraint::Length(3),
+                Constraint::Percentage(80),
+                Constraint::Percentage(20),
+            ]
+            .as_ref()
+        } else {
+            [Constraint::Length(3), Constraint::Percentage(100)].as_ref()
+        };
+
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(5)
-            .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
-            .split(size);
+            .constraints(constraints)
+            .split(f.size());
 
         Block::default()
             .style(Style::default().bg(Color::White))
@@ -118,22 +132,36 @@ fn draw_ui(
             .highlight_style(Style::default().fg(Color::Yellow))
             .render(&mut f, chunks[0]);
 
-        Paragraph::new(captured_messages[app.tabs.index].iter().rev())
+        app.messages_window.display_lines(
+            &captured_messages[app.tabs.index],
+            chunks[1].height as usize,
+        );
+
+        List::new(app.messages_window.lines.iter().cloned())
             .block(Block::default().borders(Borders::ALL).title("Messages"))
-            .alignment(Alignment::Left)
-            .wrap(true)
+            .start_corner(Corner::BottomLeft)
             .render(&mut f, chunks[1]);
+
+        if app.messages_window.line_is_selected {
+            let selected_line = app.messages_window.selected_line.as_ref().unwrap();
+
+            Paragraph::new([selected_line].iter().cloned())
+                .block(Block::default().borders(Borders::ALL).title("Selected"))
+                .alignment(Alignment::Left)
+                .wrap(true)
+                .render(&mut f, chunks[2]);
+        }
     })
 }
 
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
-            Key::Char('q') => {
-                failure::bail!("User called Quit");
-            }
-            Key::Right => app.tabs.next(),
-            Key::Left => app.tabs.previous(),
+            Key::Char('q') => failure::bail!("User called Quit"),
+            Key::Right => switch_tab(app, true),
+            Key::Left => switch_tab(app, false),
+            Key::Up => app.messages_window.previous(),
+            Key::Down => app.messages_window.next(),
             _ => {}
         }
     };
@@ -148,12 +176,10 @@ fn read_log(
 ) {
     use termion::input::TermRead;
 
-    while let Some(mut message) = reader.read_line().expect("Failed reading line") {
+    while let Some(message) = reader.read_line().expect("Failed reading line") {
         if message.is_empty() {
             break;
         }
-
-        message.push('\n');
 
         capture_message(message_types, captured_messages, &message);
     }
@@ -180,5 +206,15 @@ fn capture_message(message_types: &[String], captured_messages: &mut [Vec<Text>]
         let styled = Text::styled(message.to_string(), Style::default().fg(Color::White));
 
         captured_messages[ALL_MESSAGES_INDEX].push(styled);
+    }
+}
+
+fn switch_tab(app: &mut App, is_next: bool) {
+    app.messages_window.reset();
+
+    if is_next {
+        app.tabs.next();
+    } else {
+        app.tabs.previous();
     }
 }

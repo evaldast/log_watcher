@@ -1,2 +1,2 @@
-log_path = "/mnt/akka-logs/server.out.log"
+log_path = "/home/evaldas/test.txt"
 message_filters = ["[ERR]", "[INF]", "[DBG]", "[WRN]"]
