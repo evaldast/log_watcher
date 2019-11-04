@@ -25,6 +25,11 @@ pub struct WindowState<'a> {
     pub selected_line: Option<Text<'a>>,
 }
 
+pub struct SearchState {
+    pub is_initiated: bool,
+    pub input: String,
+}
+
 impl<'a> TabsState<'a> {
     pub fn new(titles: &[&'a str]) -> Self {
         Self {
@@ -71,7 +76,7 @@ impl<'a> WindowState<'a> {
         };
     }
 
-    pub fn display_lines(&mut self, lines: &[Text<'a>], window_height: usize) {
+    pub fn display_lines(&mut self, lines: &[Text<'a>], window_height: usize, search_input: &str) {
         self.height = window_height - BORDER_MARGIN;
 
         let skipped_line_amount = if self.height > self.selected_line_index {
@@ -80,15 +85,31 @@ impl<'a> WindowState<'a> {
             self.selected_line_index - self.height + 1
         };
 
-        let displayed_line_amount = skipped_line_amount + self.height + 1;        
+        let displayed_line_amount = skipped_line_amount + self.height + 1;
 
-        let mut lines: Vec<Text<'a>> = lines
-            .iter()
-            .rev()
-            .skip(skipped_line_amount)
-            .take(displayed_line_amount)
-            .cloned()
-            .collect();
+        let mut lines: Vec<Text<'a>> = match search_input.is_empty() {
+            true => lines
+                .iter()
+                .rev()
+                .skip(skipped_line_amount)
+                .take(displayed_line_amount)
+                .cloned()
+                .collect(),
+            false => lines
+                .iter()
+                .filter(|line| match line {
+                    Text::Styled(cow, _) => {
+                        let text_value = cow.to_string();
+                        return text_value.contains(&search_input);
+                    }
+                    _ => false,
+                })
+                .rev()
+                .skip(skipped_line_amount)
+                .take(displayed_line_amount)
+                .cloned()
+                .collect(),
+        };
 
         let selected_line_index = self.selected_line_index - skipped_line_amount;
 
@@ -117,6 +138,24 @@ impl<'a> WindowState<'a> {
     }
 }
 
+impl SearchState {
+    pub fn new() -> Self {
+        Self {
+            is_initiated: false,
+            input: String::new(),
+        }
+    }
+
+    pub fn search(&mut self) {
+        self.is_initiated = true;
+    }
+
+    pub fn close(&mut self) {
+        self.is_initiated = false;
+        self.input = String::new();
+    }
+}
+
 pub enum Event<I> {
     Input(I),
     Tick,
@@ -134,14 +173,12 @@ impl Default for Events {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
-    pub exit_key: Key,
     pub tick_rate: Duration,
 }
 
 impl Default for Config {
     fn default() -> Config {
         Config {
-            exit_key: Key::Char('q'),
             tick_rate: Duration::from_millis(100),
         }
     }
@@ -162,9 +199,6 @@ impl Events {
                 for evt in stdin.keys() {
                     if let Ok(key) = evt {
                         if tx.send(Event::Input(key)).is_err() {
-                            return;
-                        }
-                        if key == config.exit_key {
                             return;
                         }
                     }

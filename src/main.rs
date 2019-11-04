@@ -6,7 +6,8 @@ mod ui;
 
 use failure::Error;
 use std::fs::File;
-use std::io::{stdout, BufReader, Stdout};
+use std::io::{self, stdout, BufReader, Stdout, Write};
+use termion::cursor::Goto;
 use termion::event::Key;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
@@ -16,7 +17,8 @@ use tui::layout::{Alignment, Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
-use ui::{Event, Events, TabsState, WindowState};
+use ui::{Event, Events, SearchState, TabsState, WindowState};
+use unicode_width::UnicodeWidthStr;
 
 const CONFIG_FILE_NAME: &str = "config.toml";
 const CONFIG_LOG_PATH_TOML_PROPERTY: &str = "log_path";
@@ -26,6 +28,7 @@ const ALL_MESSAGES_INDEX: usize = 0;
 struct App<'a> {
     tabs: TabsState<'a>,
     messages_window: WindowState<'a>,
+    search: SearchState,
 }
 
 struct Config {
@@ -45,6 +48,7 @@ fn main() -> Result<(), failure::Error> {
     let mut app = App {
         tabs: TabsState::new(&tabs),
         messages_window: WindowState::new(),
+        search: SearchState::new(),
     };
 
     let mut terminal = setup_terminal()?;
@@ -59,6 +63,21 @@ fn main() -> Result<(), failure::Error> {
         read_user_input(&events, &mut app)?;
         read_log(&mut reader, &message_types, &mut captured_messages);
         draw_ui(&mut terminal, &mut app, &captured_messages)?;
+
+        if app.search.is_initiated {
+            terminal.show_cursor()?;
+
+            write!(
+                terminal.backend_mut(),
+                "{}",
+                Goto(7 + app.search.input.width() as u16, 7)
+            )
+            .unwrap();
+
+            io::stdout().flush().ok();
+        } else {
+            terminal.hide_cursor()?;
+        }
     }
 }
 
@@ -88,9 +107,7 @@ fn setup_terminal() -> Result<Terminal<TermionBackend<AlternateScreen<RawTermina
     let stdout = stdout().into_raw_mode()?;
     let stdout = AlternateScreen::from(stdout);
     let backend = TermionBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    terminal.hide_cursor()?;
+    let terminal = Terminal::new(backend)?;
 
     Ok(terminal)
 }
@@ -102,6 +119,7 @@ fn draw_ui<'a>(
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
         let is_alternate_view = app.messages_window.line_is_selected;
+        let is_search = app.search.is_initiated;
 
         let constraints = if is_alternate_view {
             [
@@ -124,17 +142,26 @@ fn draw_ui<'a>(
             .style(Style::default().bg(Color::White))
             .render(&mut f, chunks[0]);
 
-        Tabs::default()
-            .block(Block::default().borders(Borders::ALL).title("Tabs"))
-            .titles(&app.tabs.titles)
-            .select(app.tabs.index)
-            .style(Style::default().fg(Color::Cyan))
-            .highlight_style(Style::default().fg(Color::Yellow))
-            .render(&mut f, chunks[0]);
+        if is_search {
+            Paragraph::new([Text::raw(&app.search.input)].iter())
+                .block(Block::default().borders(Borders::ALL).title("Search Input"))
+                .alignment(Alignment::Left)
+                .wrap(true)
+                .render(&mut f, chunks[0]);
+        } else {
+            Tabs::default()
+                .block(Block::default().borders(Borders::ALL).title("Tabs"))
+                .titles(&app.tabs.titles)
+                .select(app.tabs.index)
+                .style(Style::default().fg(Color::Cyan))
+                .highlight_style(Style::default().fg(Color::Yellow))
+                .render(&mut f, chunks[0]);
+        }
 
         app.messages_window.display_lines(
             &captured_messages[app.tabs.index],
             chunks[1].height as usize,
+            &app.search.input,
         );
 
         List::new(app.messages_window.lines.iter().cloned())
@@ -157,11 +184,17 @@ fn draw_ui<'a>(
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
+            Key::Char(i) if app.search.is_initiated => app.search.input.push(i),
+            Key::Backspace if app.search.is_initiated => {
+                app.search.input.pop();
+            }
+            Key::Esc if app.search.is_initiated => app.search.close(),
             Key::Char('q') => failure::bail!("User called Quit"),
             Key::Right => switch_tab(app, true),
             Key::Left => switch_tab(app, false),
             Key::Up => app.messages_window.previous(),
             Key::Down => app.messages_window.next(),
+            Key::Char('f') => app.search.search(),
             _ => {}
         }
     };
