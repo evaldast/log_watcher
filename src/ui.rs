@@ -76,7 +76,7 @@ impl<'a> WindowState<'a> {
         };
     }
 
-    pub fn display_lines(&mut self, lines: &[Text<'a>], window_height: usize) {
+    pub fn display_lines(&mut self, lines: &[Text<'a>], window_height: usize, search_input: &str) {
         self.height = window_height - BORDER_MARGIN;
 
         let skipped_line_amount = if self.height > self.selected_line_index {
@@ -87,13 +87,29 @@ impl<'a> WindowState<'a> {
 
         let displayed_line_amount = skipped_line_amount + self.height + 1;
 
-        let mut lines: Vec<Text<'a>> = lines
-            .iter()
-            .rev()
-            .skip(skipped_line_amount)
-            .take(displayed_line_amount)
-            .cloned()
-            .collect();
+        let mut lines: Vec<Text<'a>> = match search_input.is_empty() {
+            true => lines
+                .iter()
+                .rev()
+                .skip(skipped_line_amount)
+                .take(displayed_line_amount)
+                .cloned()
+                .collect(),
+            false => lines
+                .iter()
+                .filter(|line| match line {
+                    Text::Styled(cow, _) => {
+                        let text_value = cow.to_string();
+                        return text_value.contains(&search_input);
+                    }
+                    _ => false,
+                })
+                .rev()
+                .skip(skipped_line_amount)
+                .take(displayed_line_amount)
+                .cloned()
+                .collect(),
+        };
 
         let selected_line_index = self.selected_line_index - skipped_line_amount;
 
@@ -136,6 +152,7 @@ impl SearchState {
 
     pub fn close(&mut self) {
         self.is_initiated = false;
+        self.input = String::new();
     }
 }
 

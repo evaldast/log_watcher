@@ -161,6 +161,7 @@ fn draw_ui<'a>(
         app.messages_window.display_lines(
             &captured_messages[app.tabs.index],
             chunks[1].height as usize,
+            &app.search.input,
         );
 
         List::new(app.messages_window.lines.iter().cloned())
