@@ -194,7 +194,11 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
             Key::Left => switch_tab(app, false),
             Key::Up => app.messages_window.previous(),
             Key::Down => app.messages_window.next(),
-            Key::Char('f') => app.search.search(),
+            Key::Char('f') => {
+                app.messages_window.selected_line_index = 0;
+                app.messages_window.line_is_selected = false;
+                app.search.search();
+                },
             _ => {}
         }
     };
