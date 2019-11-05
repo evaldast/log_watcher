@@ -30,6 +30,12 @@ pub struct SearchState {
     pub input: String,
 }
 
+pub struct InspectionState<'a> {
+    pub is_initiated: bool,
+    pub is_json_format: bool,
+    pub text: Option<Text<'a>>,
+}
+
 impl<'a> TabsState<'a> {
     pub fn new(titles: &[&'a str]) -> Self {
         Self {
@@ -124,9 +130,12 @@ impl<'a> WindowState<'a> {
                     Style::default().modifier(Modifier::REVERSED),
                 );
 
-                if self.line_is_selected {
-                    self.selected_line = Some(Text::styled(text_value, style_value));
-                }
+                let obj: serde_json::Value = serde_json::from_str(&text_value).unwrap();
+
+                self.selected_line = Some(Text::styled(
+                    serde_json::to_string_pretty(&obj).unwrap(),
+                    style_value,
+                ));
             }
         }
 
@@ -147,13 +156,51 @@ impl SearchState {
         }
     }
 
-    pub fn search(&mut self) {
+    pub fn initiate(&mut self) {
         self.is_initiated = true;
     }
 
     pub fn close(&mut self) {
         self.is_initiated = false;
         self.input = String::new();
+    }
+}
+
+impl<'a> InspectionState<'a> {
+    pub fn new() -> Self {
+        Self {
+            is_initiated: false,
+            is_json_format: false,
+            text: None,
+        }
+    }
+
+    pub fn initiate(&mut self) {
+        self.is_initiated = true;
+    }
+
+    pub fn close(&mut self) {
+        self.is_initiated = false;
+        self.is_json_format = false;
+        self.text = None;
+    }
+
+    pub fn inspect(&mut self, text: &Text) {
+        if let Text::Styled(cow, style) = text {
+            match serde_json::from_str::<serde_json::Value>(cow) {
+                Ok(json) => {
+                    self.text = Some(Text::styled(
+                        serde_json::to_string_pretty(&json).unwrap(),
+                        *style,
+                    ));
+
+                    self.is_json_format = true;
+                }
+                Err(_) => {
+                    self.text = Some(Text::styled(cow.to_string(), *style));
+                }
+            };
+        }
     }
 }
 

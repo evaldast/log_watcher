@@ -17,7 +17,7 @@ use tui::layout::{Alignment, Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
-use ui::{Event, Events, SearchState, TabsState, WindowState};
+use ui::{Event, Events, InspectionState, SearchState, TabsState, WindowState};
 use unicode_width::UnicodeWidthStr;
 
 const CONFIG_FILE_NAME: &str = "config.toml";
@@ -29,6 +29,7 @@ struct App<'a> {
     tabs: TabsState<'a>,
     messages_window: WindowState<'a>,
     search: SearchState,
+    inspection_window: InspectionState<'a>,
 }
 
 struct Config {
@@ -49,6 +50,7 @@ fn main() -> Result<(), failure::Error> {
         tabs: TabsState::new(&tabs),
         messages_window: WindowState::new(),
         search: SearchState::new(),
+        inspection_window: InspectionState::new(),
     };
 
     let mut terminal = setup_terminal()?;
@@ -71,8 +73,7 @@ fn main() -> Result<(), failure::Error> {
                 terminal.backend_mut(),
                 "{}",
                 Goto(7 + app.search.input.width() as u16, 7)
-            )
-            .unwrap();
+            )?;
 
             io::stdout().flush().ok();
         } else {
@@ -118,16 +119,8 @@ fn draw_ui<'a>(
     captured_messages: &[Vec<Text<'a>>],
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
-        let is_alternate_view = app.messages_window.line_is_selected;
-        let is_search = app.search.is_initiated;
-
-        let constraints = if is_alternate_view {
-            [
-                Constraint::Length(3),
-                Constraint::Percentage(80),
-                Constraint::Percentage(20),
-            ]
-            .as_ref()
+        let constraints = if app.inspection_window.is_initiated {
+            [Constraint::Percentage(100)].as_ref()
         } else {
             [Constraint::Length(3), Constraint::Percentage(100)].as_ref()
         };
@@ -142,7 +135,24 @@ fn draw_ui<'a>(
             .style(Style::default().bg(Color::White))
             .render(&mut f, chunks[0]);
 
-        if is_search {
+        if app.inspection_window.is_initiated {
+            app.inspection_window
+                .inspect(app.messages_window.selected_line.as_ref().unwrap());
+
+            Paragraph::new(
+                [app.inspection_window.text.as_ref().unwrap()]
+                    .iter()
+                    .cloned(),
+            )
+            .block(Block::default().borders(Borders::ALL).title("Selected"))
+            .alignment(Alignment::Left)
+            .wrap(!app.inspection_window.is_json_format)
+            .render(&mut f, chunks[0]);
+
+            return;
+        }
+
+        if app.search.is_initiated {
             Paragraph::new([Text::raw(&app.search.input)].iter())
                 .block(Block::default().borders(Borders::ALL).title("Search Input"))
                 .alignment(Alignment::Left)
@@ -168,37 +178,28 @@ fn draw_ui<'a>(
             .block(Block::default().borders(Borders::ALL).title("Messages"))
             .start_corner(Corner::BottomLeft)
             .render(&mut f, chunks[1]);
-
-        if app.messages_window.line_is_selected {
-            let selected_line = app.messages_window.selected_line.as_ref().unwrap();
-
-            Paragraph::new([selected_line].iter().cloned())
-                .block(Block::default().borders(Borders::ALL).title("Selected"))
-                .alignment(Alignment::Left)
-                .wrap(true)
-                .render(&mut f, chunks[2]);
-        }
     })
 }
 
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
-            Key::Char(i) if app.search.is_initiated && i != '\n' => app.search.input.push(i),
+            Key::Char(c) if app.search.is_initiated && c != '\n' => app.search.input.push(c),
             Key::Backspace if app.search.is_initiated => {
                 app.search.input.pop();
             }
             Key::Esc if app.search.is_initiated => app.search.close(),
+            Key::Esc if app.inspection_window.is_initiated => app.inspection_window.close(),
             Key::Char('q') => failure::bail!("User called Quit"),
             Key::Right => switch_tab(app, true),
             Key::Left => switch_tab(app, false),
             Key::Up => app.messages_window.previous(),
             Key::Down => app.messages_window.next(),
             Key::Char('f') => {
-                app.messages_window.selected_line_index = 0;
-                app.messages_window.line_is_selected = false;
-                app.search.search();
-                },
+                app.messages_window.reset();
+                app.search.initiate();
+            }
+            Key::Char('\n') => app.inspection_window.initiate(),
             _ => {}
         }
     };
