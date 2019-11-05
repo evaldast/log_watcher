@@ -184,7 +184,7 @@ fn draw_ui<'a>(
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
-            Key::Char(i) if app.search.is_initiated => app.search.input.push(i),
+            Key::Char(i) if app.search.is_initiated && i != '\n' => app.search.input.push(i),
             Key::Backspace if app.search.is_initiated => {
                 app.search.input.pop();
             }
