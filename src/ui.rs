@@ -87,28 +87,29 @@ impl<'a> WindowState<'a> {
 
         let displayed_line_amount = skipped_line_amount + self.height + 1;
 
-        let mut lines: Vec<Text<'a>> = match search_input.is_empty() {
-            true => lines
+        let mut lines: Vec<Text<'a>> = if search_input.is_empty() {
+            lines
                 .iter()
                 .rev()
                 .skip(skipped_line_amount)
                 .take(displayed_line_amount)
                 .cloned()
-                .collect(),
-            false => lines
+                .collect()
+        } else {
+            lines
                 .iter()
                 .filter(|line| match line {
-                    Text::Styled(cow, _) => {
-                        let text_value = cow.to_string();
-                        return text_value.contains(&search_input);
-                    }
+                    Text::Styled(cow, _) => cow
+                        .to_string()
+                        .to_lowercase()
+                        .contains(&search_input.to_lowercase()),
                     _ => false,
                 })
                 .rev()
                 .skip(skipped_line_amount)
                 .take(displayed_line_amount)
                 .cloned()
-                .collect(),
+                .collect()
         };
 
         let selected_line_index = self.selected_line_index - skipped_line_amount;
