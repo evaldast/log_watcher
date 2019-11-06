@@ -128,14 +128,9 @@ impl<'a> WindowState<'a> {
                 lines[selected_line_index] = Text::styled(
                     text_value.clone(),
                     Style::default().modifier(Modifier::REVERSED),
-                );
+                );                
 
-                let obj: serde_json::Value = serde_json::from_str(&text_value).unwrap();
-
-                self.selected_line = Some(Text::styled(
-                    serde_json::to_string_pretty(&obj).unwrap(),
-                    style_value,
-                ));
+                self.selected_line = Some(Text::styled(text_value, style_value));
             }
         }
 
