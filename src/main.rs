@@ -196,6 +196,7 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
             }
             Key::Backspace if app.search.is_initiated => {
                 app.search.input.pop();
+                app.search.should_filter = true;
             }
             Key::Esc if app.search.is_initiated => app.search.close(),
             Key::Esc if app.inspection_window.is_initiated => app.inspection_window.close(),
