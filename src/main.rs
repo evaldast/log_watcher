@@ -28,7 +28,7 @@ const ALL_MESSAGES_INDEX: usize = 0;
 struct App<'a> {
     tabs: TabsState<'a>,
     messages_window: WindowState<'a>,
-    search: SearchState,
+    search: SearchState<'a>,
     inspection_window: InspectionState<'a>,
 }
 
@@ -168,11 +168,17 @@ fn draw_ui<'a>(
                 .render(&mut f, chunks[0]);
         }
 
-        app.messages_window.display_lines(
-            &captured_messages[app.tabs.index],
-            chunks[1].height as usize,
-            &app.search.input,
-        );
+        if app.search.is_initiated && app.search.input.len() > 0 {
+            app.messages_window.display_lines(
+                &app.search.get_results(&captured_messages[app.tabs.index]),
+                chunks[1].height as usize,
+            );
+        } else {
+            app.messages_window.display_lines(
+                &captured_messages[app.tabs.index],
+                chunks[1].height as usize,
+            );
+        };
 
         List::new(app.messages_window.lines.iter().cloned())
             .block(Block::default().borders(Borders::ALL).title("Messages"))
@@ -184,7 +190,10 @@ fn draw_ui<'a>(
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
-            Key::Char(c) if app.search.is_initiated && c != '\n' => app.search.input.push(c),
+            Key::Char(c) if app.search.is_initiated && c != '\n' => {
+                app.search.input.push(c);
+                app.search.should_filter = true;
+            }
             Key::Backspace if app.search.is_initiated => {
                 app.search.input.pop();
             }
