@@ -27,17 +27,17 @@ fn main() -> Result<(), failure::Error> {
     let events = Events::new();
 
     let mut reader = BufReader::new(file);
-    let mut app = App::new(config.message_filters);
+    let mut app = App::new(config.message_filters.clone());
     let mut terminal = setup_terminal()?;
     let mut captured_messages: Vec<Vec<Text>> = vec![];
 
-    for _ in 0..=app.tabs.titles.len() {
+    for _ in 0..=config.message_filters.len() {
         captured_messages.push(vec![]);
     }
 
     loop {
         read_user_input(&events, &mut app)?;
-        read_log(&mut reader, &app.tabs.titles, &mut captured_messages);
+        read_log(&mut reader, &config.message_filters.clone(), &mut captured_messages);
         draw_ui(&mut terminal, &mut app, &captured_messages)?;
 
         if app.search.is_initiated {
