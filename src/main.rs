@@ -1,6 +1,7 @@
 extern crate termion;
 extern crate toml;
 extern crate tui;
+extern crate chrono;
 
 use failure::Error;
 use log_watcher::{App, Config, Event, Events};
@@ -16,6 +17,7 @@ use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
 use unicode_width::UnicodeWidthStr;
+use chrono::prelude::*;
 
 const ALL_MESSAGES_INDEX: usize = 0;
 
@@ -70,6 +72,8 @@ fn draw_ui<'a>(
     captured_messages: &[Vec<Text<'a>>],
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
+        let current_time_string = Utc::now().format("%Y-%m-%d-%H:%M:%S").to_string();
+
         let constraints = if app.inspection_window.is_initiated {
             [Constraint::Percentage(100)].as_ref()
         } else {
@@ -82,7 +86,7 @@ fn draw_ui<'a>(
             .constraints(constraints)
             .split(f.size());
 
-        Block::default()
+        Block::default()            
             .style(Style::default().bg(Color::White))
             .render(&mut f, chunks[0]);
 
@@ -105,13 +109,13 @@ fn draw_ui<'a>(
 
         if app.search.is_initiated {
             Paragraph::new([Text::raw(&app.search.input)].iter())
-                .block(Block::default().borders(Borders::ALL).title("Search Input"))
+                .block(Block::default().borders(Borders::ALL).title(&format!("Search Input-{}", current_time_string)))
                 .alignment(Alignment::Left)
                 .wrap(true)
                 .render(&mut f, chunks[0]);
         } else {
             Tabs::default()
-                .block(Block::default().borders(Borders::ALL).title("Tabs"))
+                .block(Block::default().borders(Borders::ALL).title(&format!("Tabs-{}", current_time_string)))
                 .titles(&app.tabs.titles)
                 .select(app.tabs.index)
                 .style(Style::default().fg(Color::Cyan))

@@ -5,8 +5,8 @@ pub struct TabsState {
 
 impl TabsState {
     pub fn new(titles: Vec<String>) -> Self {
-        let mut vector = vec!["All".to_owned()];
-        vector.splice(0..0, titles);
+        let mut vector = titles;        
+        vector.splice(0..0, vec!["All".to_owned()]);
 
         Self {
             titles: vector,

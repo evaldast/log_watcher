@@ -32,31 +32,41 @@ impl<'a> SearchState<'a> {
             self.should_filter = false;
 
             let search_input = &self.input.to_lowercase();
+            self.results = lines
+                    .iter()
+                    .filter(|line| match line {
+                        Text::Styled(cow, _) => {
+                            cow.to_string().to_lowercase().contains(search_input)
+                        }
+                        _ => false,
+                    })
+                    .cloned()
+                    .collect();
 
-            if self.input.len() > 1 {
-                self.results = self
-                    .results
-                    .iter()
-                    .filter(|line| match line {
-                        Text::Styled(cow, _) => {
-                            cow.to_string().to_lowercase().contains(search_input)
-                        }
-                        _ => false,
-                    })
-                    .cloned()
-                    .collect();
-            } else {
-                self.results = lines
-                    .iter()
-                    .filter(|line| match line {
-                        Text::Styled(cow, _) => {
-                            cow.to_string().to_lowercase().contains(search_input)
-                        }
-                        _ => false,
-                    })
-                    .cloned()
-                    .collect();
-            }
+            // if self.input.len() > 1 {
+            //     self.results = self
+            //         .results
+            //         .iter()
+            //         .filter(|line| match line {
+            //             Text::Styled(cow, _) => {
+            //                 cow.to_string().to_lowercase().contains(search_input)
+            //             }
+            //             _ => false,
+            //         })
+            //         .cloned()
+            //         .collect();
+            // } else {
+            //     self.results = lines
+            //         .iter()
+            //         .filter(|line| match line {
+            //             Text::Styled(cow, _) => {
+            //                 cow.to_string().to_lowercase().contains(search_input)
+            //             }
+            //             _ => false,
+            //         })
+            //         .cloned()
+            //         .collect();
+            // }
         }
 
         &self.results
