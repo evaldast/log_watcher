@@ -2,68 +2,40 @@ extern crate termion;
 extern crate toml;
 extern crate tui;
 
-mod ui;
-
 use failure::Error;
+use log_watcher::{App, Config, Event, Events};
 use std::fs::File;
 use std::io::{self, stdout, BufReader, Stdout, Write};
 use termion::cursor::Goto;
 use termion::event::Key;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
-use toml::Value;
 use tui::backend::TermionBackend;
 use tui::layout::{Alignment, Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
-use ui::{Event, Events, InspectionState, SearchState, TabsState, WindowState};
 use unicode_width::UnicodeWidthStr;
 
-const CONFIG_FILE_NAME: &str = "config.toml";
-const CONFIG_LOG_PATH_TOML_PROPERTY: &str = "log_path";
-const MESSAGE_FILTERS_TOML_PROPERTY: &str = "message_filters";
 const ALL_MESSAGES_INDEX: usize = 0;
 
-struct App<'a> {
-    tabs: TabsState<'a>,
-    messages_window: WindowState<'a>,
-    search: SearchState<'a>,
-    inspection_window: InspectionState<'a>,
-}
-
-struct Config {
-    log_path: String,
-    message_filters: Vec<String>,
-}
-
 fn main() -> Result<(), failure::Error> {
-    let config = load_config()?;
-    let log_path = config.log_path;
-    let message_types = config.message_filters;
-
-    let file = File::open(log_path).expect("Failed opening file");
-    let mut reader = BufReader::new(file);
-    let tabs: Vec<&str> = message_types.iter().map(AsRef::as_ref).collect();
-
-    let mut app = App {
-        tabs: TabsState::new(&tabs),
-        messages_window: WindowState::new(),
-        search: SearchState::new(),
-        inspection_window: InspectionState::new(),
-    };
-
-    let mut terminal = setup_terminal()?;
+    let config = Config::new()?;
+    let file = File::open(config.log_path).expect("Failed opening file");
     let events = Events::new();
+
+    let mut reader = BufReader::new(file);
+    let mut app = App::new(config.message_filters);
+    let mut terminal = setup_terminal()?;
     let mut captured_messages: Vec<Vec<Text>> = vec![];
 
-    for _ in 0..=message_types.len() {
+    for _ in 0..=app.tabs.titles.len() {
         captured_messages.push(vec![]);
     }
 
     loop {
         read_user_input(&events, &mut app)?;
-        read_log(&mut reader, &message_types, &mut captured_messages);
+        read_log(&mut reader, &app.tabs.titles, &mut captured_messages);
         draw_ui(&mut terminal, &mut app, &captured_messages)?;
 
         if app.search.is_initiated {
@@ -80,27 +52,6 @@ fn main() -> Result<(), failure::Error> {
             terminal.hide_cursor()?;
         }
     }
-}
-
-fn load_config() -> Result<Config, Error> {
-    let config = std::fs::read_to_string(CONFIG_FILE_NAME)
-        .expect("Failed loading config file")
-        .parse::<Value>()
-        .expect("Failed loading config values");
-
-    let log_path = config[CONFIG_LOG_PATH_TOML_PROPERTY]
-        .as_str()
-        .expect("Failed loading config value log_path");
-
-    let message_filters = config[MESSAGE_FILTERS_TOML_PROPERTY]
-        .clone()
-        .try_into::<Vec<String>>()
-        .expect("Failed loading config value captured_events");
-
-    Ok(Config {
-        log_path: log_path.to_string(),
-        message_filters,
-    })
 }
 
 fn setup_terminal() -> Result<Terminal<TermionBackend<AlternateScreen<RawTerminal<Stdout>>>>, Error>
