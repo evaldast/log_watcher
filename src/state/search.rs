@@ -1,4 +1,5 @@
 use tui::widgets::Text;
+use rayon::prelude::*;
 
 pub struct SearchState<'a> {
     pub results: Vec<Text<'a>>,
@@ -33,7 +34,7 @@ impl<'a> SearchState<'a> {
 
             let search_input = &self.input.to_lowercase();
             self.results = lines
-                    .iter()
+                    .par_iter()
                     .filter(|line| match line {
                         Text::Styled(cow, _) => {
                             cow.to_string().to_lowercase().contains(search_input)

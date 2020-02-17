@@ -27,7 +27,7 @@ fn main() -> Result<(), failure::Error> {
     let events = Events::new();
 
     let mut reader = BufReader::new(file);
-    let mut app = App::new(config.message_filters.clone());
+    let mut app = App::new(&config.message_filters);
     let mut terminal = setup_terminal()?;
     let mut captured_messages: Vec<Vec<Text>> = vec![];
 
@@ -37,7 +37,7 @@ fn main() -> Result<(), failure::Error> {
 
     loop {
         read_user_input(&events, &mut app)?;
-        read_log(&mut reader, &config.message_filters.clone(), &mut captured_messages);
+        read_log(&mut reader, &config.message_filters, &mut captured_messages);
         draw_ui(&mut terminal, &mut app, &captured_messages)?;
 
         if app.search.is_initiated {
@@ -109,13 +109,13 @@ fn draw_ui<'a>(
 
         if app.search.is_initiated {
             Paragraph::new([Text::raw(&app.search.input)].iter())
-                .block(Block::default().borders(Borders::ALL).title(&format!("Search Input-{}", current_time_string)))
+                .block(Block::default().borders(Borders::ALL).title(&current_time_string))
                 .alignment(Alignment::Left)
                 .wrap(true)
                 .render(&mut f, chunks[0]);
         } else {
             Tabs::default()
-                .block(Block::default().borders(Borders::ALL).title(&format!("Tabs-{}", current_time_string)))
+                .block(Block::default().borders(Borders::ALL).title(&current_time_string))
                 .titles(&app.tabs.titles)
                 .select(app.tabs.index)
                 .style(Style::default().fg(Color::Cyan))
