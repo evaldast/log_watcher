@@ -1,5 +1,5 @@
-use tui::widgets::Text;
 use rayon::prelude::*;
+use tui::widgets::Text;
 
 pub struct SearchState<'a> {
     pub results: Vec<Text<'a>>,
@@ -34,15 +34,13 @@ impl<'a> SearchState<'a> {
 
             let search_input = &self.input.to_lowercase();
             self.results = lines
-                    .par_iter()
-                    .filter(|line| match line {
-                        Text::Styled(cow, _) => {
-                            cow.to_string().to_lowercase().contains(search_input)
-                        }
-                        _ => false,
-                    })
-                    .cloned()
-                    .collect();
+                .par_iter()
+                .filter(|line| match line {
+                    Text::Styled(cow, _) => cow.to_string().to_lowercase().contains(search_input),
+                    _ => false,
+                })
+                .cloned()
+                .collect();
 
             // if self.input.len() > 1 {
             //     self.results = self

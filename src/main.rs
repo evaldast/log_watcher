@@ -1,8 +1,9 @@
+extern crate chrono;
 extern crate termion;
 extern crate toml;
 extern crate tui;
-extern crate chrono;
 
+use chrono::prelude::*;
 use failure::Error;
 use log_watcher::{App, Config, Event, Events};
 use std::fs::File;
@@ -17,7 +18,6 @@ use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
 use unicode_width::UnicodeWidthStr;
-use chrono::prelude::*;
 
 const ALL_MESSAGES_INDEX: usize = 0;
 
@@ -40,7 +40,7 @@ fn main() -> Result<(), failure::Error> {
         read_log(&mut reader, &config.message_filters, &mut captured_messages);
         draw_ui(&mut terminal, &mut app, &captured_messages)?;
 
-        if app.search.is_initiated {
+        if app.search.is_initiated && !app.inspection_window.is_initiated {
             terminal.show_cursor()?;
 
             write!(
@@ -86,7 +86,7 @@ fn draw_ui<'a>(
             .constraints(constraints)
             .split(f.size());
 
-        Block::default()            
+        Block::default()
             .style(Style::default().bg(Color::White))
             .render(&mut f, chunks[0]);
 
@@ -99,7 +99,11 @@ fn draw_ui<'a>(
                     .iter()
                     .cloned(),
             )
-            .block(Block::default().borders(Borders::ALL).title("Selected"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(&current_time_string),
+            )
             .alignment(Alignment::Left)
             .wrap(!app.inspection_window.is_json_format)
             .render(&mut f, chunks[0]);
@@ -109,13 +113,21 @@ fn draw_ui<'a>(
 
         if app.search.is_initiated {
             Paragraph::new([Text::raw(&app.search.input)].iter())
-                .block(Block::default().borders(Borders::ALL).title(&current_time_string))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(&current_time_string),
+                )
                 .alignment(Alignment::Left)
                 .wrap(true)
                 .render(&mut f, chunks[0]);
         } else {
             Tabs::default()
-                .block(Block::default().borders(Borders::ALL).title(&current_time_string))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(&current_time_string),
+                )
                 .titles(&app.tabs.titles)
                 .select(app.tabs.index)
                 .style(Style::default().fg(Color::Cyan))
@@ -145,16 +157,18 @@ fn draw_ui<'a>(
 fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
     if let Event::Input(input) = events.next()? {
         match input {
-            Key::Char(c) if app.search.is_initiated && c != '\n' => {
+            Key::Char(c)
+                if app.search.is_initiated && !app.inspection_window.is_initiated && c != '\n' =>
+            {
                 app.search.input.push(c);
                 app.search.should_filter = true;
             }
-            Key::Backspace if app.search.is_initiated => {
+            Key::Backspace if app.search.is_initiated && !app.inspection_window.is_initiated => {
                 app.search.input.pop();
                 app.search.should_filter = true;
             }
-            Key::Esc if app.search.is_initiated => app.search.close(),
             Key::Esc if app.inspection_window.is_initiated => app.inspection_window.close(),
+            Key::Esc if app.search.is_initiated => app.search.close(),
             Key::Char('q') => failure::bail!("User called Quit"),
             Key::Right => switch_tab(app, true),
             Key::Left => switch_tab(app, false),
