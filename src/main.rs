@@ -17,7 +17,6 @@ use tui::layout::{Alignment, Constraint, Corner, Direction, Layout};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::Terminal;
-use unicode_width::UnicodeWidthStr;
 
 const ALL_MESSAGES_INDEX: usize = 0;
 
@@ -46,7 +45,7 @@ fn main() -> Result<(), failure::Error> {
             write!(
                 terminal.backend_mut(),
                 "{}",
-                Goto(7 + app.search.input.width() as u16, 7)
+                Goto(7 + &app.search.get_cursor_location(), 7)
             )?;
 
             io::stdout().flush().ok();
@@ -154,20 +153,28 @@ fn draw_ui<'a>(
     })
 }
 
-fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
+fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> { //TODO: Group and cleanup
     if let Event::Input(input) = events.next()? {
         match input {
             Key::Char(c)
                 if app.search.is_initiated && !app.inspection_window.is_initiated && c != '\n' =>
-            {
-                app.search.input.push(c);
-                app.search.should_filter = true;
+            {                
+                app.search.add_input(c);                
                 app.messages_window.reset();
             }
             Key::Backspace if app.search.is_initiated && !app.inspection_window.is_initiated => {
-                app.search.input.pop();
-                app.search.should_filter = true;
+                app.search.remove_input_backspace();
                 app.messages_window.reset();
+            }
+            Key::Delete if app.search.is_initiated && !app.inspection_window.is_initiated => {
+                app.search.remove_input_delete();
+                app.messages_window.reset();
+            }
+            Key::Left if app.search.is_initiated && !app.inspection_window.is_initiated => {
+                app.search.cursor_move_left()
+            }
+            Key::Right if app.search.is_initiated && !app.inspection_window.is_initiated => {
+                app.search.cursor_move_right()
             }
             Key::Esc if app.inspection_window.is_initiated => app.inspection_window.close(),
             Key::Esc if app.search.is_initiated => app.search.close(),
