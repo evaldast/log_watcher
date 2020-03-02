@@ -29,6 +29,10 @@ impl<'a> WindowState<'a> {
     }
 
     pub fn previous(&mut self) {
+        if self.lines.len() <= self.selected_line_index + 1 {
+            return
+        }
+
         if self.line_is_selected {
             self.selected_line_index += 1
         } else {
