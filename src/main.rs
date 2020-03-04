@@ -179,6 +179,7 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
             }
             Key::Esc if app.inspection_window.is_initiated => app.inspection_window.close(),
             Key::Esc if app.search.is_initiated => app.search.close(),
+            Key::Esc if app.messages_window.line_is_selected => app.messages_window.reset(),
             Key::Char('q') => failure::bail!("User called Quit"),
             Key::Right => switch_tab(app, true),
             Key::Left => switch_tab(app, false),
