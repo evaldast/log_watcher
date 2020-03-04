@@ -153,13 +153,14 @@ fn draw_ui<'a>(
     })
 }
 
-fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> { //TODO: Group and cleanup
+fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
+    //TODO: Group and cleanup
     if let Event::Input(input) = events.next()? {
         match input {
             Key::Char(c)
                 if app.search.is_initiated && !app.inspection_window.is_initiated && c != '\n' =>
-            {                
-                app.search.add_input(c);                
+            {
+                app.search.add_input(c);
                 app.messages_window.reset();
             }
             Key::Backspace if app.search.is_initiated && !app.inspection_window.is_initiated => {
