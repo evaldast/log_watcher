@@ -73,13 +73,9 @@ impl Events {
         };
 
         let _tick_handle = {
-            let tx = tx.clone();
-            thread::spawn(move || {
-                let tx = tx.clone();
-                loop {
-                    tx.send(Event::Tick).unwrap();
-                    thread::sleep(Duration::from_millis(100));
-                }
+            thread::spawn(move || loop {
+                tx.send(Event::Tick).unwrap();
+                thread::sleep(Duration::from_millis(100));
             })
         };
 

@@ -2,6 +2,7 @@ use rayon::prelude::*;
 use tui::widgets::Text;
 use unicode_width::UnicodeWidthStr;
 
+#[derive(Default)]
 pub struct SearchState<'a> {
     pub results: Vec<Text<'a>>,
     pub is_initiated: bool,
@@ -88,7 +89,7 @@ impl<'a> SearchState<'a> {
     }
 
     pub fn cursor_move_left(&mut self) {
-        if self.cursor_location == 0 && self.input.len() > 0 {
+        if self.cursor_location == 0 && !self.input.is_empty() {
             self.cursor_location = self.input.len() - 1;
         } else if self.cursor_location > 0 {
             self.cursor_location -= 1;

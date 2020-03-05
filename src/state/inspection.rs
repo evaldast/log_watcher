@@ -1,5 +1,6 @@
 use tui::widgets::Text;
 
+#[derive(Default)]
 pub struct InspectionState<'a> {
     pub is_initiated: bool,
     pub is_json_format: bool,

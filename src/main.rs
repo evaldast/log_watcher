@@ -134,7 +134,7 @@ fn draw_ui<'a>(
                 .render(&mut f, chunks[0]);
         }
 
-        if app.search.is_initiated && app.search.input.len() > 0 {
+        if app.search.is_initiated && !app.search.input.is_empty() {
             app.messages_window.display_lines(
                 &app.search.get_results(&captured_messages[app.tabs.index]),
                 chunks[1].height as usize,
