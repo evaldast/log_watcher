@@ -23,7 +23,7 @@ impl<'a> WindowState<'a> {
             selected_line_index: 0,
             selected_line_index_relative: 0,
             line_count: 0,
-            displayed_line_amount: 0,            
+            displayed_line_amount: 0,
         }
     }
 
@@ -47,19 +47,20 @@ impl<'a> WindowState<'a> {
 
             if self.selected_line_index < self.displayed_line_amount {
                 self.selected_line_index_relative += 1;
-            }            
+            }
         } else {
             self.line_is_selected = true
         };
     }
 
     pub fn display_lines(&mut self, lines: &[Text<'a>], window_height: usize) {
-        self.displayed_line_amount = window_height - BORDER_MARGIN;
+        self.calculate_displayed_line_amount(window_height);
+        self.calculate_relative_selected_line_index();
         self.line_count = lines.len();
 
         let skipped_line_amount = self.selected_line_index - self.selected_line_index_relative;
 
-        let mut lines: Vec<Text<'a>> = lines
+        self.lines = lines
             .iter()
             .rev()
             .skip(skipped_line_amount)
@@ -68,25 +69,37 @@ impl<'a> WindowState<'a> {
             .collect();
 
         if self.line_is_selected {
-            if let Text::Styled(cow, style) = &lines[self.selected_line_index_relative] {
-                let text_value = cow.to_string();
-                let style_value = *style;
-
-                lines[self.selected_line_index_relative] = Text::styled(
-                    text_value.clone(),
-                    Style::default().modifier(Modifier::REVERSED),
-                );
-
-                self.selected_line = Some(Text::styled(text_value, style_value));
-            }
+            self.apply_selected_style();
         }
-
-        self.lines = lines;
     }
 
     pub fn reset(&mut self) {
         self.line_is_selected = false;
         self.selected_line_index = 0;
         self.selected_line_index_relative = 0;
+    }
+
+    fn apply_selected_style(&mut self) {
+        if let Text::Styled(cow, style) = &self.lines[self.selected_line_index_relative] {
+            let text_value = cow.to_string();
+            let style_value = *style;
+
+            self.lines[self.selected_line_index_relative] = Text::styled(
+                text_value.clone(),
+                Style::default().modifier(Modifier::REVERSED),
+            );
+
+            self.selected_line = Some(Text::styled(text_value, style_value));
+        }
+    }
+
+    fn calculate_displayed_line_amount(&mut self, window_height: usize) {
+        self.displayed_line_amount = window_height - BORDER_MARGIN;
+    }
+
+    fn calculate_relative_selected_line_index(&mut self) {
+        if self.selected_line_index_relative >= self.displayed_line_amount - 1 {
+            self.selected_line_index_relative = self.displayed_line_amount - 1;
+        }
     }
 }

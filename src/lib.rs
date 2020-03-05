@@ -38,7 +38,7 @@ pub struct Config {
 }
 
 impl<'a> App<'a> {
-    pub fn new(message_filters: &Vec<String>) -> App<'a> {
+    pub fn new(message_filters: &[String]) -> App<'a> {
         App {
             tabs: TabsState::new(message_filters),
             messages_window: WindowState::new(),
