@@ -105,6 +105,7 @@ fn draw_ui<'a>(
             )
             .alignment(Alignment::Left)
             .wrap(!app.inspection_window.is_json_format)
+            .scroll(app.inspection_window.scroll_value)
             .render(&mut f, chunks[0]);
 
             return;
@@ -186,7 +187,9 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
             Key::Char('q') => failure::bail!("User called Quit"),
             Key::Right => switch_tab(app, true),
             Key::Left => switch_tab(app, false),
+            Key::Up if app.inspection_window.is_initiated => app.inspection_window.scroll_up(),
             Key::Up => app.messages_window.previous(),
+            Key::Down if app.inspection_window.is_initiated => app.inspection_window.scroll_down(),
             Key::Down => app.messages_window.next(),
             Key::Char('f') => {
                 app.messages_window.reset();

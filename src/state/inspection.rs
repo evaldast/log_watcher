@@ -5,6 +5,7 @@ pub struct InspectionState<'a> {
     pub is_initiated: bool,
     pub is_json_format: bool,
     pub text: Option<Text<'a>>,
+    pub scroll_value: u16,
 }
 
 impl<'a> InspectionState<'a> {
@@ -13,6 +14,7 @@ impl<'a> InspectionState<'a> {
             is_initiated: false,
             is_json_format: false,
             text: None,
+            scroll_value: 0,
         }
     }
 
@@ -24,6 +26,7 @@ impl<'a> InspectionState<'a> {
         self.is_initiated = false;
         self.is_json_format = false;
         self.text = None;
+        self.scroll_value = 0;
     }
 
     pub fn inspect(&mut self, text: &Text) {
@@ -67,6 +70,17 @@ impl<'a> InspectionState<'a> {
                     self.text = Some(Text::styled(cow.to_string(), *style));
                 }
             };
+        }
+    }
+
+    pub fn scroll_down(&mut self) {
+        //TODO: count newline markers from self.text to forbid from scrolling below available text
+        self.scroll_value += 1
+    }
+
+    pub fn scroll_up(&mut self) {
+        if self.scroll_value > 0 {
+            self.scroll_value -= 1
         }
     }
 }
