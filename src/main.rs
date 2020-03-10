@@ -71,7 +71,7 @@ fn draw_ui<'a>(
     captured_messages: &[Vec<Text<'a>>],
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
-        let current_time_string = Utc::now().format("%Y-%m-%d-%H:%M:%S").to_string();
+        let current_time_string = Utc::now().format("%Y-%m-%d-%H:%M:%S").to_string();        
 
         let constraints = if app.inspection_window.is_initiated {
             [Constraint::Percentage(100)].as_ref()

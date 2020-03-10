@@ -8,8 +8,8 @@ pub struct WindowState<'a> {
     pub lines: Vec<Text<'a>>,
     pub line_is_selected: bool,
     pub selected_line: Option<Text<'a>>,
-    selected_line_index: usize,
-    selected_line_index_relative: usize,
+    pub selected_line_index: usize,
+    pub selected_line_index_relative: usize,
     line_count: usize,
     displayed_line_amount: usize,
 }
@@ -44,10 +44,7 @@ impl<'a> WindowState<'a> {
 
         if self.line_is_selected {
             self.selected_line_index += 1;
-
-            if self.selected_line_index < self.displayed_line_amount {
-                self.selected_line_index_relative += 1;
-            }
+            self.selected_line_index_relative += 1;
         } else {
             self.line_is_selected = true
         };
