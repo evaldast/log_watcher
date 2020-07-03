@@ -81,7 +81,6 @@ fn draw_ui<'a>(
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .margin(5)
             .constraints(constraints)
             .split(f.size());
 
