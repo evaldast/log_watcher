@@ -45,7 +45,7 @@ fn main() -> Result<(), failure::Error> {
             write!(
                 terminal.backend_mut(),
                 "{}",
-                Goto(7 + &app.search.get_cursor_location(), 7)
+                Goto(2 + &app.search.get_cursor_location(), 2)
             )?;
 
             io::stdout().flush().ok();
