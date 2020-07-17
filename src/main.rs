@@ -195,6 +195,7 @@ fn read_user_input(events: &Events, app: &mut App) -> Result<(), Error> {
                 app.search.initiate();
             }
             Key::Char('\n') => app.inspection_window.initiate(),
+            Key::End => app.sound_player.play(),
             _ => {}
         }
     };

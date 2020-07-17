@@ -3,7 +3,7 @@ pub mod state;
 extern crate termion;
 
 use failure::Error;
-use state::{InspectionState, SearchState, TabsState, WindowState};
+use state::{InspectionState, SearchState, TabsState, WindowState, SoundPlayer};
 use std::io;
 use std::sync::mpsc;
 use std::thread;
@@ -21,6 +21,7 @@ pub struct App<'a> {
     pub messages_window: WindowState<'a>,
     pub search: SearchState<'a>,
     pub inspection_window: InspectionState<'a>,
+    pub sound_player: SoundPlayer
 }
 
 pub enum Event<I> {
@@ -44,6 +45,7 @@ impl<'a> App<'a> {
             messages_window: WindowState::new(),
             search: SearchState::new(),
             inspection_window: InspectionState::new(),
+            sound_player: SoundPlayer::new("fus-ro-dah.mp3"),
         }
     }
 }
