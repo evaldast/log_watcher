@@ -232,6 +232,8 @@ fn read_log(
         }
 
         capture_message(message_types, captured_messages, &message);
+
+        app.is_preloaded = false; //Temporary counter measure for files littered with EOF
     }
 
     app.is_preloaded = true;
