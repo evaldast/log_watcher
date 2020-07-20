@@ -22,11 +22,11 @@ const ALL_MESSAGES_INDEX: usize = 0;
 
 fn main() -> Result<(), failure::Error> {
     let config = Config::new()?;
-    let file = File::open(config.log_path).expect("Failed opening file");
+    let file = File::open(config.log_path.clone()).expect("Failed opening file");
     let events = Events::new();
 
     let mut reader = BufReader::new(file);
-    let mut app = App::new(&config.message_filters);
+    let mut app = App::new(&config);
     let mut terminal = setup_terminal()?;
     let mut captured_messages: Vec<Vec<Text>> = vec![];
 
@@ -36,7 +36,18 @@ fn main() -> Result<(), failure::Error> {
 
     loop {
         read_user_input(&events, &mut app)?;
-        read_log(&mut reader, &config.message_filters, &mut captured_messages);
+
+        read_log(
+            &mut reader,
+            &config.message_filters,
+            &mut captured_messages,
+            &mut app,
+        );
+
+        if !app.is_preloaded {
+            continue;
+        }
+
         draw_ui(&mut terminal, &mut app, &captured_messages)?;
 
         if app.search.is_initiated && !app.inspection_window.is_initiated {
@@ -71,7 +82,7 @@ fn draw_ui<'a>(
     captured_messages: &[Vec<Text<'a>>],
 ) -> Result<(), std::io::Error> {
     terminal.draw(|mut f| {
-        let current_time_string = Utc::now().format("%Y-%m-%d-%H:%M:%S").to_string();        
+        let current_time_string = Utc::now().format("%Y-%m-%d-%H:%M:%S").to_string();
 
         let constraints = if app.inspection_window.is_initiated {
             [Constraint::Percentage(100)].as_ref()
@@ -207,6 +218,7 @@ fn read_log(
     reader: &mut BufReader<File>,
     message_types: &[String],
     captured_messages: &mut [Vec<Text>],
+    app: &mut App,
 ) {
     use termion::input::TermRead;
 
@@ -215,8 +227,14 @@ fn read_log(
             break;
         }
 
+        if app.is_preloaded && message.contains(app.notify_on) {
+            app.sound_player.play();
+        }
+
         capture_message(message_types, captured_messages, &message);
     }
+
+    app.is_preloaded = true;
 }
 
 fn capture_message(message_types: &[String], captured_messages: &mut [Vec<Text>], message: &str) {

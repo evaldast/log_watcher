@@ -62,7 +62,7 @@ impl<'a> InspectionState<'a> {
                         &cow[json_closing_brace_index..].to_string()
                     );
 
-                    self.text = Some(Text::styled(text_to_display, *style));                    
+                    self.text = Some(Text::styled(text_to_display, *style));
                     self.is_json_format = true;
                 }
                 Err(_) => {
