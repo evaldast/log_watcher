@@ -1,4 +1,4 @@
 log_path = "/home/evaldas/dev/akka-logs/server.out.log"
-message_filters = ["[ERR]", "[INF]", "[DBG]", "[WRN]"]
-notification_sound_path = "fus-ro-dah.mp3"
-notify_on = "[DBG]"
+message_filters = ["[ERR]", "[DBG]", "[WRN]", "[INF]"]
+notification_sound_path = "mgs_alert.mp3"
+notify_on = "[ERR]"
